@@ -1,31 +1,49 @@
 from openpyxl.styles import Font
 
 
+def _find_col(df, keywords):
+    """
+    Find first column containing any keyword (case-insensitive)
+    """
+    for col in df.columns:
+        name = col.lower()
+        for k in keywords:
+            if k in name:
+                return col
+    return None
+
+
 def build_report(wb, sales_df, inventory_df, deals_df, brand, branch, payout_cycle):
     ws = wb.create_sheet("Report")
 
     # =========================
-    # SAFE DEAL DETECTION
+    # COLUMN DETECTION (SAFE)
     # =========================
-    brand_col = deals_df.columns[0]
+    sales_brand_col = _find_col(sales_df, ["brand"])
+    sales_qty_col = _find_col(sales_df, ["qty", "quantity"])
+    sales_total_col = _find_col(sales_df, ["total", "amount", "price"])
+    sales_product_col = _find_col(sales_df, ["product", "item", "name"])
 
-    pct_col = next(
-        (c for c in deals_df.columns if "percent" in c.lower()),
-        None
-    )
+    inv_brand_col = _find_col(inventory_df, ["brand"])
+    inv_qty_col = _find_col(inventory_df, ["qty", "quantity"])
+    inv_price_col = _find_col(inventory_df, ["price", "cost"])
 
-    rent_col = next(
-        (c for c in deals_df.columns if "rent" in c.lower()),
-        None
-    )
-
-    deal_row = deals_df[deals_df[brand_col] == brand]
-
-    pct = deal_row[pct_col].iloc[0] if pct_col and not deal_row.empty else 0
-    rent = deal_row[rent_col].iloc[0] if rent_col and not deal_row.empty else 0
+    deal_brand_col = deals_df.columns[0]
+    deal_pct_col = _find_col(deals_df, ["percent"])
+    deal_rent_col = _find_col(deals_df, ["rent"])
 
     # =========================
-    # DEAL TEXT FORMAT (FINAL)
+    # FILTER DATA
+    # =========================
+    brand_sales = sales_df[sales_df[sales_brand_col] == brand]
+    brand_inventory = inventory_df[inventory_df[inv_brand_col] == brand]
+    deal_row = deals_df[deals_df[deal_brand_col] == brand]
+
+    pct = deal_row[deal_pct_col].iloc[0] if deal_pct_col and not deal_row.empty else 0
+    rent = deal_row[deal_rent_col].iloc[0] if deal_rent_col and not deal_row.empty else 0
+
+    # =========================
+    # DEAL TEXT
     # =========================
     if pct > 0 and rent > 0:
         deal_text = f"{pct}% + {rent} Deducted from the sales"
@@ -37,46 +55,35 @@ def build_report(wb, sales_df, inventory_df, deals_df, brand, branch, payout_cyc
         deal_text = "No Deal"
 
     # =========================
-    # SALES CALCULATIONS
+    # CALCULATIONS
     # =========================
-    brand_sales = sales_df[sales_df["brand"] == brand]
-
-    total_sales_qty = brand_sales["quantity"].sum()
-    total_sales_money = brand_sales["total"].sum()
+    total_sales_qty = brand_sales[sales_qty_col].sum() if sales_qty_col else 0
+    total_sales_money = brand_sales[sales_total_col].sum() if sales_total_col else 0
 
     after_percentage = total_sales_money - (total_sales_money * pct / 100)
     after_rent = after_percentage - rent
 
-    # =========================
-    # INVENTORY CALCULATIONS
-    # =========================
-    brand_inventory = inventory_df[inventory_df["brand"] == brand]
-
-    total_inventory_qty = (
-        brand_inventory["quantity"].sum()
-        if "quantity" in brand_inventory.columns
-        else brand_inventory.iloc[:, -1].sum()
+    total_inventory_qty = brand_inventory[inv_qty_col].sum() if inv_qty_col else 0
+    total_inventory_price = (
+        (brand_inventory[inv_qty_col] * brand_inventory[inv_price_col]).sum()
+        if inv_qty_col and inv_price_col else 0
     )
-
-    total_inventory_price = 0
-    if "price" in brand_inventory.columns:
-        total_inventory_price = (
-            brand_inventory["price"] * brand_inventory["quantity"]
-        ).sum()
 
     # =========================
     # BEST SELLING PRODUCT
     # =========================
     best_product = "N/A"
-    if not brand_sales.empty:
-        best_product = (
-            brand_sales.groupby("product")["quantity"]
+    if sales_product_col and sales_qty_col and not brand_sales.empty:
+        grouped = (
+            brand_sales
+            .groupby(sales_product_col)[sales_qty_col]
             .sum()
-            .idxmax()
         )
+        if not grouped.empty:
+            best_product = grouped.idxmax()
 
     # =========================
-    # WRITE REPORT (ORDERED)
+    # WRITE REPORT
     # =========================
     rows = [
         ("Branch Name", branch),
@@ -98,11 +105,8 @@ def build_report(wb, sales_df, inventory_df, deals_df, brand, branch, payout_cyc
         ("Total Sales After Rent", after_rent),
     ]
 
-    for row in rows:
-        ws.append(row)
+    for r in rows:
+        ws.append(r)
 
-    # =========================
-    # STYLING
-    # =========================
     for cell in ws["A"]:
         cell.font = Font(bold=True)
