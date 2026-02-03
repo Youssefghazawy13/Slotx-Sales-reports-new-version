@@ -2,25 +2,35 @@ from openpyxl.styles import Font
 
 def build_sales(wb, sales_df, brand, branch):
     ws = wb.create_sheet("Sales")
-    ws.append(["Branch", "Brand", "Product", "Barcode", "Quantity", "Price"])
+
+    headers = ["Branch", "Brand", "Product", "Barcode", "Quantity", "Price"]
+    ws.append(headers)
+
+    for c in ws[1]:
+        c.font = Font(bold=True)
 
     total_qty = 0
-    total_money = 0
+    total_price = 0
 
-    for _, r in sales_df[sales_df["brand"] == brand].iterrows():
+    brand_sales = sales_df[sales_df["brand"] == brand]
+
+    for _, r in brand_sales.iterrows():
+        qty = r.get("quantity", 0)
+        price = r.get("total", 0)
+
         ws.append([
             branch,
             brand,
-            r.get("product"),
+            r.get("product"),   # ✅ اسم المنتج
             r.get("barcode"),
-            r.get("quantity"),
-            r.get("total")
+            qty,
+            price
         ])
-        total_qty += r.get("quantity", 0)
-        total_money += r.get("total", 0)
 
-    ws.append(["", "", "", "Total", f"Total={total_qty}", f"Total={total_money}"])
+        total_qty += qty
+        total_price += price
 
-    for cell in ws[1]:
+    # ✅ Total مرة واحدة فقط + Bold
+    ws.append(["", "", "", "Total", total_qty, total_price])
+    for cell in ws[ws.max_row]:
         cell.font = Font(bold=True)
-# sales logic
