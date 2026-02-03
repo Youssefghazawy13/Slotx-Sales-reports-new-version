@@ -2,9 +2,16 @@ from openpyxl.styles import Font
 
 def build_inventory(wb, inv_df, brand, branch):
     ws = wb.create_sheet("Inventory")
-    ws.append(["Branch", "Brand", "Product", "Barcode", "Price", "Quantity"])
 
-    for _, r in inv_df[inv_df["brand"] == brand].iterrows():
+    headers = ["Branch", "Brand", "Product", "Barcode", "Price", "Quantity"]
+    ws.append(headers)
+
+    for c in ws[1]:
+        c.font = Font(bold=True)
+
+    brand_inv = inv_df[inv_df["brand"] == brand]
+
+    for _, r in brand_inv.iterrows():
         ws.append([
             branch,
             brand,
@@ -13,7 +20,3 @@ def build_inventory(wb, inv_df, brand, branch):
             r.get("price"),
             r.get("quantity")
         ])
-
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-# inventory logic
