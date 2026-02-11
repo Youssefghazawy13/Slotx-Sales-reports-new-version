@@ -61,7 +61,7 @@ def create_inventory_sheet(wb, brand_inventory, mode):
     ws.append(headers)
 
     # =========================
-    # HEADER STYLE
+    # HEADER STYLE (Same as Sales)
     # =========================
 
     header_fill = PatternFill(
@@ -123,7 +123,7 @@ def create_inventory_sheet(wb, brand_inventory, mode):
     last_row = ws.max_row
 
     # =========================
-    # ZEBRA ROWS
+    # ZEBRA STYLE
     # =========================
 
     stripe_fill = PatternFill(
@@ -133,7 +133,6 @@ def create_inventory_sheet(wb, brand_inventory, mode):
     )
 
     for row in range(2, last_row + 1):
-
         if row % 2 == 0:
             for col in range(1, ws.max_column + 1):
                 ws.cell(row=row, column=col).fill = stripe_fill
@@ -142,10 +141,10 @@ def create_inventory_sheet(wb, brand_inventory, mode):
     # NUMBER FORMATTING
     # =========================
 
-    # Price column
+    # Price column with currency
     for row in ws.iter_rows(min_row=2, min_col=3, max_col=3):
         for cell in row:
-            cell.number_format = '#,##0.00'
+            cell.number_format = '#,##0.00 "EGP"'
 
     # Quantity columns
     if is_merged:
