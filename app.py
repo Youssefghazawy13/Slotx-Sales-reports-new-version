@@ -16,9 +16,9 @@ st.set_page_config(
 
 st.title("Slot-X Sales & Inventory Reports")
 
-# =====================================
+# ==============================
 # MODE
-# =====================================
+# ==============================
 
 mode = st.selectbox(
     "Select Mode",
@@ -32,9 +32,9 @@ payout_cycle = st.selectbox(
 
 st.divider()
 
-# =====================================
+# ==============================
 # FILE UPLOADS
-# =====================================
+# ==============================
 
 if mode == "Merged":
 
@@ -52,9 +52,9 @@ else:
     inventory_file = st.file_uploader("Upload Inventory File")
     deals_file = st.file_uploader("Upload Deals File")
 
-# =====================================
+# ==============================
 # GENERATE
-# =====================================
+# ==============================
 
 if st.button("Generate Reports"):
 
@@ -78,15 +78,16 @@ if st.button("Generate Reports"):
             deals_zam = load_deals_by_mode(deals_file, "Zamalek")
             deals_alex = load_deals_by_mode(deals_file, "Alexandria")
 
+            # 🔥 FIXED: BRAND BASED (NOT PRODUCT)
             all_brands = set(
-                list(inv_zam["name_en"].unique()) +
-                list(inv_alex["name_en"].unique())
+                list(inv_zam["brand"].unique()) +
+                list(inv_alex["brand"].unique())
             )
 
             for brand in all_brands:
 
-                zam_inv_brand = inv_zam[inv_zam["name_en"] == brand]
-                alex_inv_brand = inv_alex[inv_alex["name_en"] == brand]
+                zam_inv_brand = inv_zam[inv_zam["brand"] == brand]
+                alex_inv_brand = inv_alex[inv_alex["brand"] == brand]
 
                 zam_qty = zam_inv_brand["available_quantity"].sum()
                 alex_qty = alex_inv_brand["available_quantity"].sum()
@@ -95,17 +96,9 @@ if st.button("Generate Reports"):
                     branch_type = "Merged"
                     deals_dict = deals_merged
 
-                    brand_inventory = pd.merge(
-                        alex_inv_brand,
-                        zam_inv_brand,
-                        on=["name_en", "barcodes", "sale_price"],
-                        how="outer",
-                        suffixes=("_alex", "_zamalek")
-                    ).fillna(0)
-
-                    brand_inventory["available_quantity"] = (
-                        brand_inventory.get("available_quantity_alex", 0) +
-                        brand_inventory.get("available_quantity_zamalek", 0)
+                    brand_inventory = pd.concat(
+                        [alex_inv_brand, zam_inv_brand],
+                        ignore_index=True
                     )
 
                 elif zam_qty > 0:
@@ -121,9 +114,10 @@ if st.button("Generate Reports"):
                 else:
                     continue
 
+                # SALES FILTER (by brand)
                 brand_sales = pd.concat([
-                    sales_zam[sales_zam["name_ar"] == brand],
-                    sales_alex[sales_alex["name_ar"] == brand]
+                    sales_zam[sales_zam["brand"] == brand],
+                    sales_alex[sales_alex["brand"] == brand]
                 ])
 
                 total_sales_qty = brand_sales["quantity"].sum()
@@ -158,7 +152,7 @@ if st.button("Generate Reports"):
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
         # ======================================================
-        # SINGLE BRANCH MODE
+        # SINGLE MODE
         # ======================================================
 
         else:
@@ -167,16 +161,17 @@ if st.button("Generate Reports"):
             inventory_df = pd.read_excel(inventory_file)
             deals_dict = load_deals_by_mode(deals_file, mode)
 
-            brands = inventory_df["name_en"].unique()
+            # 🔥 FIXED: BRAND BASED
+            brands = inventory_df["brand"].unique()
 
             for brand in brands:
 
                 brand_inventory = inventory_df[
-                    inventory_df["name_en"] == brand
+                    inventory_df["brand"] == brand
                 ]
 
                 brand_sales = sales_df[
-                    sales_df["name_ar"] == brand
+                    sales_df["brand"] == brand
                 ]
 
                 total_sales_qty = brand_sales["quantity"].sum()
@@ -210,10 +205,7 @@ if st.button("Generate Reports"):
 
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
-            # -------------------------------
-            # SUMMARY (ONLY SINGLE MODE)
-            # -------------------------------
-
+            # SUMMARY
             summary_wb = build_branch_summary_workbook(
                 branch_name=mode,
                 payout_cycle=payout_cycle,
