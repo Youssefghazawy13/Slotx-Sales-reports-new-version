@@ -18,20 +18,19 @@ def create_metadata_sheet(
     dark_blue_font = Font(color="1F4E78")
     bold_dark_blue_font = Font(bold=True, color="1F4E78")
 
-    # 🔥 Get absolute path safely
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(current_dir)
-    logo_path = os.path.join(project_root, "assets", "logo.png")
+    # 🔥 Simple & reliable path
+    logo_path = os.path.join("assets", "logo.png")
 
     if os.path.exists(logo_path):
         try:
             img = Image(logo_path)
-            img.width = 150
-            img.height = 80
+            img.width = 160
+            img.height = 90
             ws.add_image(img, "A1")
-        except Exception:
-            pass
+        except Exception as e:
+            print("Logo load error:", e)
 
+    # spacing
     ws.append([""])
     ws.append([""])
     ws.append([""])
