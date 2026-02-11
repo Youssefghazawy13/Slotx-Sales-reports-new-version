@@ -1,12 +1,8 @@
 # reports/report_sheet.py
 
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from utils.excel_helpers import auto_fit_columns, format_money_cell
-from core.kpi_engine import (
-    apply_deal,
-    get_best_selling_product,
-    get_best_selling_size
-)
+from utils.excel_helpers import auto_fit_columns
+from core.kpi_engine import apply_deal
 
 
 def create_report_sheet(
@@ -34,21 +30,20 @@ def create_report_sheet(
     )
 
     # =====================================================
-    # SMALL KPI CARDS (Dark Blue)
+    # SMALL KPI CARDS (SLIM DESIGN)
     # =====================================================
 
     def create_kpi_card(row, col, title, value):
 
         ws.merge_cells(start_row=row, start_column=col,
-                       end_row=row+1, end_column=col+2)
+                       end_row=row, end_column=col+2)
 
         cell = ws.cell(row=row, column=col)
-        cell.value = f"{title}\n{value}"
+        cell.value = f"{title}: {value}"
 
-        cell.font = Font(size=12, bold=True, color="FFFFFF")
+        cell.font = Font(size=11, bold=True, color="FFFFFF")
         cell.alignment = Alignment(horizontal="center",
-                                   vertical="center",
-                                   wrap_text=True)
+                                   vertical="center")
 
         fill = PatternFill(
             start_color="0A1F5C",
@@ -63,10 +58,9 @@ def create_report_sheet(
             bottom=Side(style="thin")
         )
 
-        for r in range(row, row+2):
-            for c in range(col, col+3):
-                ws.cell(row=r, column=c).fill = fill
-                ws.cell(row=r, column=c).border = border
+        for c in range(col, col+3):
+            ws.cell(row=row, column=c).fill = fill
+            ws.cell(row=row, column=c).border = border
 
     create_kpi_card(2, 1, "Total Sales",
                     f"{total_sales_money:,.2f} EGP")
@@ -78,10 +72,10 @@ def create_report_sheet(
                     total_inventory_qty)
 
     # =====================================================
-    # BASIC REPORT INFO (زي القديم)
+    # REPORT DETAILS BELOW KPIs
     # =====================================================
 
-    start_row = 6
+    start_row = 5
 
     ws.cell(row=start_row, column=1,
             value="Branch Name:").font = Font(bold=True)
@@ -100,32 +94,44 @@ def create_report_sheet(
     ws.cell(row=start_row+3, column=2, value=total_sales_qty)
 
     ws.cell(row=start_row+4, column=1,
-            value="Total Inventory Quantity:").font = Font(bold=True)
-    ws.cell(row=start_row+4, column=2, value=total_inventory_qty)
+            value="Total Sales Money:").font = Font(bold=True)
+    ws.cell(row=start_row+4, column=2,
+            value=f"{total_sales_money:,.2f} EGP")
 
     ws.cell(row=start_row+5, column=1,
-            value="Total Inventory Value:").font = Font(bold=True)
-    ws.cell(row=start_row+5, column=2,
-            value=f"{total_inventory_value:,.2f} EGP")
+            value="Total Inventory Quantity:").font = Font(bold=True)
+    ws.cell(row=start_row+5, column=2, value=total_inventory_qty)
 
     ws.cell(row=start_row+6, column=1,
-            value="After Percentage:").font = Font(bold=True)
+            value="Total Inventory Value:").font = Font(bold=True)
     ws.cell(row=start_row+6, column=2,
-            value=f"{after_percentage:,.2f} EGP")
+            value=f"{total_inventory_value:,.2f} EGP")
 
     ws.cell(row=start_row+7, column=1,
-            value="After Rent:").font = Font(bold=True)
+            value="After Percentage:").font = Font(bold=True)
     ws.cell(row=start_row+7, column=2,
+            value=f"{after_percentage:,.2f} EGP")
+
+    ws.cell(row=start_row+8, column=1,
+            value="After Rent:").font = Font(bold=True)
+    ws.cell(row=start_row+8, column=2,
             value=f"{after_rent:,.2f} EGP")
 
     # =====================================================
-    # TOP PRODUCTS SECTION (بدون Chart)
+    # TOP PRODUCTS PERFORMANCE
     # =====================================================
 
-    top_start = start_row + 10
+    top_start = start_row + 11
 
     ws.cell(row=top_start, column=1,
-            value="Top Products").font = Font(size=13, bold=True)
+            value="Top Products Performance").font = Font(size=13, bold=True)
+
+    ws.cell(row=top_start+1, column=1,
+            value="Product").font = Font(bold=True)
+    ws.cell(row=top_start+1, column=2,
+            value="Quantity").font = Font(bold=True)
+    ws.cell(row=top_start+1, column=3,
+            value="Sales").font = Font(bold=True)
 
     product_sales = (
         brand_sales.groupby("product_name")["quantity"]
@@ -137,6 +143,7 @@ def create_report_sheet(
     row_pointer = top_start + 2
 
     for product, qty in product_sales.items():
+
         revenue = brand_sales[
             brand_sales["product_name"] == product
         ]["total"].sum()
