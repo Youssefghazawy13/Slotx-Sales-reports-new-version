@@ -55,15 +55,15 @@ def create_inventory_sheet(wb, brand_inventory, mode):
 
     for _, row in brand_inventory.iterrows():
 
-        product = row.get("product_name", "")
-        barcode = row.get("barcode", "")
-        price = row.get("price", 0)
+        product = row.get("name_en", "")
+        barcode = row.get("barcodes", "")
+        price = row.get("sale_price", 0)
 
         if is_merged:
 
             alex = row.get("alex_qty", 0)
             zam = row.get("zamalek_qty", 0)
-            total = row.get("quantity", 0)
+            total = alex + zam
 
             status = get_status(total)
 
@@ -80,7 +80,7 @@ def create_inventory_sheet(wb, brand_inventory, mode):
 
         else:
 
-            qty = row.get("quantity", 0)
+            qty = row.get("available_quantity", 0)
             status = get_status(qty)
 
             ws.append([
@@ -91,19 +91,5 @@ def create_inventory_sheet(wb, brand_inventory, mode):
                 status,
                 ""
             ])
-
-    # Color status
-    for row in ws.iter_rows(min_row=2):
-
-        status_cell = row[-2]
-
-        if status_cell.value == "Critical":
-            status_cell.fill = PatternFill("solid", fgColor="FFC7CE")
-        elif status_cell.value == "Low":
-            status_cell.fill = PatternFill("solid", fgColor="FFEB9C")
-        elif status_cell.value == "Medium":
-            status_cell.fill = PatternFill("solid", fgColor="C6EFCE")
-        elif status_cell.value == "Good":
-            status_cell.fill = PatternFill("solid", fgColor="A9D08E")
 
     auto_fit_columns(ws)
