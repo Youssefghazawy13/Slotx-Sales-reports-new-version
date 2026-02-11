@@ -14,6 +14,23 @@ def get_status(qty):
         return "Good"
 
 
+def get_note(status):
+
+    if status == "Critical":
+        return "Brand requires urgent restocking"
+
+    elif status == "Low":
+        return "Stock level is low – restock recommended"
+
+    elif status == "Medium":
+        return "Stock level is moderate – monitor movement"
+
+    elif status == "Good":
+        return "Stock level is healthy"
+
+    return ""
+
+
 def create_inventory_sheet(wb, brand_inventory, mode):
 
     ws = wb.create_sheet("Inventory")
@@ -43,9 +60,9 @@ def create_inventory_sheet(wb, brand_inventory, mode):
 
     ws.append(headers)
 
-    # =====================================================
-    # HEADER STYLE (Same as Sales)
-    # =====================================================
+    # =========================
+    # HEADER STYLE
+    # =========================
 
     header_fill = PatternFill(
         start_color="0A1F5C",
@@ -58,23 +75,24 @@ def create_inventory_sheet(wb, brand_inventory, mode):
         cell.font = Font(bold=True, color="FFFFFF")
         cell.alignment = Alignment(horizontal="center")
 
-    # =====================================================
+    # =========================
     # DATA ROWS
-    # =====================================================
+    # =========================
 
     for _, row in brand_inventory.iterrows():
 
         product = row.get("name_en", "")
         barcode = row.get("barcodes", "")
-        price = row.get("sale_price", 0)
+        price = float(row.get("sale_price", 0) or 0)
 
         if is_merged:
 
-            alex = row.get("alex_qty", 0)
-            zam = row.get("zamalek_qty", 0)
-            total = row.get("available_quantity", 0)
+            alex = float(row.get("alex_qty", 0) or 0)
+            zam = float(row.get("zamalek_qty", 0) or 0)
+            total = float(row.get("available_quantity", 0) or 0)
 
             status = get_status(total)
+            note = get_note(status)
 
             ws.append([
                 product,
@@ -84,13 +102,14 @@ def create_inventory_sheet(wb, brand_inventory, mode):
                 zam,
                 total,
                 status,
-                ""
+                note
             ])
 
         else:
 
-            qty = row.get("available_quantity", 0)
+            qty = float(row.get("available_quantity", 0) or 0)
             status = get_status(qty)
+            note = get_note(status)
 
             ws.append([
                 product,
@@ -98,14 +117,14 @@ def create_inventory_sheet(wb, brand_inventory, mode):
                 price,
                 qty,
                 status,
-                ""
+                note
             ])
 
     last_row = ws.max_row
 
-    # =====================================================
-    # ZEBRA STRIPES (Same as Sales)
-    # =====================================================
+    # =========================
+    # ZEBRA ROWS
+    # =========================
 
     stripe_fill = PatternFill(
         start_color="E9EEF7",
@@ -119,16 +138,16 @@ def create_inventory_sheet(wb, brand_inventory, mode):
             for col in range(1, ws.max_column + 1):
                 ws.cell(row=row, column=col).fill = stripe_fill
 
-    # =====================================================
+    # =========================
     # NUMBER FORMATTING
-    # =====================================================
+    # =========================
 
-    # Price formatting
+    # Price column
     for row in ws.iter_rows(min_row=2, min_col=3, max_col=3):
         for cell in row:
             cell.number_format = '#,##0.00'
 
-    # Quantity formatting
+    # Quantity columns
     if is_merged:
         qty_cols = [4, 5, 6]
     else:
@@ -138,9 +157,5 @@ def create_inventory_sheet(wb, brand_inventory, mode):
         for row in ws.iter_rows(min_row=2, min_col=col, max_col=col):
             for cell in row:
                 cell.number_format = '#,##0'
-
-    # =====================================================
-    # AUTO FIT
-    # =====================================================
 
     auto_fit_columns(ws)
