@@ -5,7 +5,7 @@ from io import BytesIO
 
 from reports.workbook_builder import build_brand_workbook
 from reports.branch_summary_workbook import build_branch_summary_workbook
-from core.deals_engine import load_branch_deals
+from core.deals_engine import load_deals_by_mode
 
 
 st.set_page_config(
@@ -74,9 +74,9 @@ if st.button("Generate Reports"):
             sales_alex = pd.read_excel(sales_alex_file)
             inv_alex = pd.read_excel(inventory_alex_file)
 
-            deals_merged = load_branch_deals(deals_file, "Merged")
-            deals_zam = load_branch_deals(deals_file, "Zamalek")
-            deals_alex = load_branch_deals(deals_file, "Alexandria")
+            deals_merged = load_deals_by_mode(deals_file, "Merged")
+            deals_zam = load_deals_by_mode(deals_file, "Zamalek")
+            deals_alex = load_deals_by_mode(deals_file, "Alexandria")
 
             all_brands = set(
                 list(inv_zam["name_en"].unique()) +
@@ -91,10 +91,6 @@ if st.button("Generate Reports"):
                 zam_qty = zam_inv_brand["available_quantity"].sum()
                 alex_qty = alex_inv_brand["available_quantity"].sum()
 
-                # ------------------------------
-                # DETERMINE BRANCH TYPE
-                # ------------------------------
-
                 if alex_qty > 0 and zam_qty > 0:
                     branch_type = "Merged"
                     deals_dict = deals_merged
@@ -108,8 +104,8 @@ if st.button("Generate Reports"):
                     ).fillna(0)
 
                     brand_inventory["available_quantity"] = (
-                        brand_inventory["available_quantity_alex"] +
-                        brand_inventory["available_quantity_zamalek"]
+                        brand_inventory.get("available_quantity_alex", 0) +
+                        brand_inventory.get("available_quantity_zamalek", 0)
                     )
 
                 elif zam_qty > 0:
@@ -125,10 +121,6 @@ if st.button("Generate Reports"):
                 else:
                     continue
 
-                # ------------------------------
-                # SALES
-                # ------------------------------
-
                 brand_sales = pd.concat([
                     sales_zam[sales_zam["name_ar"] == brand],
                     sales_alex[sales_alex["name_ar"] == brand]
@@ -140,22 +132,12 @@ if st.button("Generate Reports"):
                 percentage = deal["percentage"]
                 rent = deal["rent"]
 
-                # ------------------------------
-                # SUBFOLDER LOGIC
-                # ------------------------------
-
                 if total_sales_qty == 0:
                     subfolder = "Empty Brand Guard"
-
                 elif percentage == 0 and rent == 0:
                     subfolder = "No Deal"
-
                 else:
                     subfolder = None
-
-                # ------------------------------
-                # BUILD REPORT
-                # ------------------------------
 
                 workbook_buffer = build_brand_workbook(
                     brand_name=brand,
@@ -183,7 +165,7 @@ if st.button("Generate Reports"):
 
             sales_df = pd.read_excel(sales_file)
             inventory_df = pd.read_excel(inventory_file)
-            deals_dict = load_branch_deals(deals_file, mode)
+            deals_dict = load_deals_by_mode(deals_file, mode)
 
             brands = inventory_df["name_en"].unique()
 
@@ -205,10 +187,8 @@ if st.button("Generate Reports"):
 
                 if total_sales_qty == 0:
                     subfolder = "Empty Brand Guard"
-
                 elif percentage == 0 and rent == 0:
                     subfolder = "No Deal"
-
                 else:
                     subfolder = None
 
@@ -230,9 +210,9 @@ if st.button("Generate Reports"):
 
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
-            # ----------------------------------------
-            # BRANCH SUMMARY (ONLY SINGLE MODE)
-            # ----------------------------------------
+            # -------------------------------
+            # SUMMARY (ONLY SINGLE MODE)
+            # -------------------------------
 
             summary_wb = build_branch_summary_workbook(
                 branch_name=mode,
