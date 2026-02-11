@@ -9,17 +9,13 @@ from reports.metadata_sheet import create_metadata_sheet
 
 
 def build_brand_workbook(
-    brand_name: str,
-    mode: str,
-    payout_cycle: str,
+    brand_name,
+    mode,
+    payout_cycle,
     brand_sales,
     brand_inventory,
-    deals_dict: dict
+    deals_dict
 ):
-
-    # ==========================================
-    # Defensive Handling
-    # ==========================================
 
     if brand_sales is None:
         brand_sales = pd.DataFrame()
@@ -27,40 +23,29 @@ def build_brand_workbook(
     if brand_inventory is None:
         brand_inventory = pd.DataFrame()
 
-    if not isinstance(brand_sales, pd.DataFrame):
-        brand_sales = pd.DataFrame(brand_sales)
-
-    if not isinstance(brand_inventory, pd.DataFrame):
-        brand_inventory = pd.DataFrame(brand_inventory)
-
-    # Skip completely empty brand
     if brand_sales.empty and brand_inventory.empty:
         return None
 
     wb = Workbook()
+    wb.remove(wb.active)
 
-    # Remove default sheet
-    default_sheet = wb.active
-    wb.remove(default_sheet)
+    # ==========================
+    # Sales Totals
+    # ==========================
 
-    # ==========================================
-    # Calculate Sales Totals (SAFE)
-    # ==========================================
+    total_sales_qty = (
+        brand_sales["quantity"].sum()
+        if "quantity" in brand_sales.columns else 0
+    )
 
-    total_sales_qty = 0
-    total_sales_money = 0
+    total_sales_money = (
+        brand_sales["total"].sum()
+        if "total" in brand_sales.columns else 0
+    )
 
-    if not brand_sales.empty:
-
-        if "quantity" in brand_sales.columns:
-            total_sales_qty = brand_sales["quantity"].sum()
-
-        if "total" in brand_sales.columns:
-            total_sales_money = brand_sales["total"].sum()
-
-    # ==========================================
-    # Calculate Inventory Totals (SAFE)
-    # ==========================================
+    # ==========================
+    # Inventory Totals
+    # ==========================
 
     total_inventory_qty = 0
     total_inventory_value = 0
@@ -82,32 +67,23 @@ def build_brand_workbook(
             total_inventory_qty = alex_qty + zam_qty
 
         else:
+            total_inventory_qty = (
+                brand_inventory["quantity"].sum()
+                if "quantity" in brand_inventory.columns else 0
+            )
 
-            if "quantity" in brand_inventory.columns:
-                total_inventory_qty = brand_inventory["quantity"].sum()
-
-        # Inventory Value
         if "price" in brand_inventory.columns and "quantity" in brand_inventory.columns:
             total_inventory_value = (
-                brand_inventory["price"] *
-                brand_inventory["quantity"]
+                brand_inventory["price"]
+                * brand_inventory["quantity"]
             ).sum()
 
-    # ==========================================
-    # Create Sheets (STRICT ORDER)
-    # ==========================================
+    # ==========================
+    # Create Sheets (ORDER)
+    # ==========================
 
-    create_sales_sheet(
-        wb,
-        brand_sales,
-        mode
-    )
-
-    create_inventory_sheet(
-        wb,
-        brand_inventory,
-        mode
-    )
+    create_sales_sheet(wb, brand_sales, mode)
+    create_inventory_sheet(wb, brand_inventory, mode)
 
     create_report_sheet(
         wb,
@@ -122,15 +98,7 @@ def build_brand_workbook(
         deals_dict
     )
 
-    create_metadata_sheet(
-        wb,
-        mode,
-        payout_cycle
-    )
-
-    # ==========================================
-    # Save to Buffer
-    # ==========================================
+    create_metadata_sheet(wb, mode, payout_cycle)
 
     buffer = BytesIO()
     wb.save(buffer)
