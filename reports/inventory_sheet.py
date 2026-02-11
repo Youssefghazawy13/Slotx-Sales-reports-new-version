@@ -1,4 +1,5 @@
 from openpyxl.styles import Font
+from openpyxl.worksheet.table import Table, TableStyleInfo
 from utils.excel_helpers import auto_fit_columns
 
 
@@ -43,6 +44,7 @@ def create_inventory_sheet(wb, brand_inventory, mode):
 
     ws.append(headers)
 
+    # Bold header
     for cell in ws[1]:
         cell.font = Font(bold=True)
 
@@ -84,5 +86,30 @@ def create_inventory_sheet(wb, brand_inventory, mode):
                 status,
                 ""
             ])
+
+    # ==============================
+    # TABLE STYLE (NO FILTERS)
+    # ==============================
+
+    last_row = ws.max_row
+    last_col = ws.max_column
+
+    table = Table(
+        displayName="InventoryTable",
+        ref=f"A1:{chr(64+last_col)}{last_row}"
+    )
+
+    style = TableStyleInfo(
+        name="TableStyleMedium9",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False
+    )
+
+    table.tableStyleInfo = style
+    table.autoFilter = None  # 🔥 Remove filter arrows
+
+    ws.add_table(table)
 
     auto_fit_columns(ws)
