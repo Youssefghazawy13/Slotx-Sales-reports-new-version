@@ -1,10 +1,40 @@
-from openpyxl.styles import Font, PatternFill, Alignment
-from utils.excel_helpers import auto_fit_columns
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 
-def create_sales_sheet(wb, brand_sales, mode):
+def auto_fit(ws):
+    for col in ws.columns:
+        max_length = 0
+        col_letter = get_column_letter(col[0].column)
 
+        for cell in col:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+
+        ws.column_dimensions[col_letter].width = max_length + 3
+
+
+def create_sales_sheet(wb, brand_sales, branch_name):
     ws = wb.create_sheet("Sales")
+
+    # ===== HEADER STYLE =====
+    header_fill = PatternFill(
+        start_color="1F4E78",
+        end_color="1F4E78",
+        fill_type="solid"
+    )
+
+    header_font = Font(
+        bold=True,
+        color="FFFFFF"
+    )
+
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin")
+    )
 
     headers = [
         "Branch",
@@ -17,80 +47,44 @@ def create_sales_sheet(wb, brand_sales, mode):
 
     ws.append(headers)
 
-    # =========================
-    # HEADER STYLE
-    # =========================
-
-    header_fill = PatternFill(
-        start_color="0A1F5C",
-        end_color="0A1F5C",
-        fill_type="solid"
-    )
-
-    for cell in ws[1]:
+    for col in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col)
         cell.fill = header_fill
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.alignment = Alignment(horizontal="center")
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
 
+    # ===== DATA ROWS =====
     total_qty = 0
-    total_price = 0
-
-    # =========================
-    # DATA ROWS
-    # =========================
+    total_money = 0
 
     for _, row in brand_sales.iterrows():
-
-        branch = mode
-        brand = row.get("brand", "")
-        product = row.get("name_ar", "")
-        barcode = row.get("barcode", "")
-        qty = float(row.get("quantity", 0) or 0)
-        price = float(row.get("total", 0) or 0)
+        qty = row.get("quantity", 0)
+        price = row.get("total", 0)
 
         total_qty += qty
-        total_price += price
+        total_money += price
 
         ws.append([
-            branch,
-            brand,
-            product,
-            barcode,
+            branch_name,
+            row.get("brand", ""),
+            row.get("product_name", ""),
+            row.get("barcode", ""),
             qty,
             f"{price:,.2f} EGP"
         ])
 
-    last_row = ws.max_row + 1
+    # ===== TOTAL ROW INSIDE TABLE =====
+    total_row_index = ws.max_row + 1
 
-    # =========================
-    # TOTAL ROW (NO WORD TOTAL)
-    # =========================
+    ws.cell(row=total_row_index, column=5).value = f"Total={int(total_qty)}"
+    ws.cell(row=total_row_index, column=6).value = f"Total={total_money:,.2f} EGP"
 
-    ws.append([
-        "",
-        "",
-        "",
-        "",
-        f"Total={int(total_qty)}",
-        f"Total={total_price:,.2f} EGP"
-    ])
+    for col in range(1, 7):
+        cell = ws.cell(row=total_row_index, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
 
-    for cell in ws[ws.max_row]:
-        cell.font = Font(bold=True)
-
-    # =========================
-    # ZEBRA STYLE
-    # =========================
-
-    stripe_fill = PatternFill(
-        start_color="E9EEF7",
-        end_color="E9EEF7",
-        fill_type="solid"
-    )
-
-    for row in range(2, ws.max_row):
-        if row % 2 == 0:
-            for col in range(1, ws.max_column + 1):
-                ws.cell(row=row, column=col).fill = stripe_fill
-
-    auto_fit_columns(ws)
+    auto_fit(ws)
