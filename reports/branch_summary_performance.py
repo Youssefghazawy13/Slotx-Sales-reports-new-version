@@ -34,7 +34,7 @@ def create_performance_sheet(
     sales_grouped["Rank"] = sales_grouped.index + 1
 
     # =====================================================
-    # GROUP INVENTORY PER BRAND (FIXED)
+    # GROUP INVENTORY PER BRAND
     # =====================================================
 
     inventory_grouped = (
@@ -52,7 +52,7 @@ def create_performance_sheet(
     )
 
     # =====================================================
-    # MERGE CORRECTLY ON BRAND
+    # MERGE ON BRAND
     # =====================================================
 
     summary_df = sales_grouped.merge(
@@ -71,6 +71,8 @@ def create_performance_sheet(
     after_percentage_list = []
     after_rent_list = []
     after_all_list = []
+    percentage_deduction_list = []
+    rent_deduction_list = []
 
     for _, row in summary_df.iterrows():
 
@@ -78,82 +80,76 @@ def create_performance_sheet(
         sales_money = row["total"]
 
         deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
-
         percentage = deal["percentage"]
         rent = deal["rent"]
 
-        after_percentage = sales_money - (sales_money * percentage / 100)
+        percentage_deduction = sales_money * (percentage / 100)
+        after_percentage = sales_money - percentage_deduction
         after_rent = after_percentage - rent
 
+        percentage_deduction_list.append(percentage_deduction)
+        rent_deduction_list.append(rent)
         after_percentage_list.append(after_percentage)
         after_rent_list.append(after_rent)
         after_all_list.append(after_rent)
 
+    summary_df["percentage_deduction"] = percentage_deduction_list
+    summary_df["rent_deduction"] = rent_deduction_list
     summary_df["after_percentage"] = after_percentage_list
     summary_df["after_rent"] = after_rent_list
     summary_df["after_all"] = after_all_list
 
     # =====================================================
-# KPI CARDS (5 SIDE BY SIDE)
-# =====================================================
+    # KPI CARDS (5 SIDE BY SIDE)
+    # =====================================================
 
-total_sales_money = summary_df["total"].sum()
+    total_sales_money = summary_df["total"].sum()
+    total_percentage_deduction = summary_df["percentage_deduction"].sum()
+    total_rent_deduction = summary_df["rent_deduction"].sum()
+    total_after_all = summary_df["after_all"].sum()
+    total_deductions = total_percentage_deduction + total_rent_deduction
 
-total_percentage_deduction = (
-    summary_df["total"] - summary_df["after_percentage"]
-).sum()
+    kpi_fill = PatternFill(
+        start_color="0A1F5C",
+        end_color="0A1F5C",
+        fill_type="solid"
+    )
 
-total_rent_deduction = (
-    summary_df["after_percentage"] - summary_df["after_rent"]
-).sum()
+    kpi_titles = [
+        "Total Branch Sales",
+        "Total % Deducted",
+        "Total Rent Deducted",
+        "Total Deductions",
+        "Sales After All Deductions"
+    ]
 
-total_after_all = summary_df["after_all"].sum()
+    kpi_values = [
+        total_sales_money,
+        total_percentage_deduction,
+        total_rent_deduction,
+        total_deductions,
+        total_after_all
+    ]
 
-total_deductions = (
-    total_percentage_deduction + total_rent_deduction
-)
+    for i, (title, value) in enumerate(zip(kpi_titles, kpi_values)):
 
-kpi_fill = PatternFill(
-    start_color="0A1F5C",
-    end_color="0A1F5C",
-    fill_type="solid"
-)
+        col_letter = chr(65 + i)  # A,B,C,D,E
 
-kpi_titles = [
-    "Total Branch Sales",
-    "Total % Deducted",
-    "Total Rent Deducted",
-    "Total Deductions",
-    "Sales After All Deductions"
-]
+        ws[f"{col_letter}1"] = title
+        ws[f"{col_letter}2"] = value
 
-kpi_values = [
-    total_sales_money,
-    total_percentage_deduction,
-    total_rent_deduction,
-    total_deductions,
-    total_after_all
-]
+        ws[f"{col_letter}1"].fill = kpi_fill
+        ws[f"{col_letter}2"].fill = kpi_fill
 
-for i, (title, value) in enumerate(zip(kpi_titles, kpi_values)):
+        ws[f"{col_letter}1"].font = Font(bold=True, color="FFFFFF")
+        ws[f"{col_letter}2"].font = Font(bold=True, color="FFFFFF")
 
-    col_letter = chr(65 + i)  # A, B, C, D, E
+        ws[f"{col_letter}1"].alignment = Alignment(horizontal="center")
+        ws[f"{col_letter}2"].alignment = Alignment(horizontal="center")
 
-    ws[f"{col_letter}1"] = title
-    ws[f"{col_letter}2"] = value
+        ws[f"{col_letter}2"].number_format = '#,##0.00 "EGP"'
 
-    ws[f"{col_letter}1"].fill = kpi_fill
-    ws[f"{col_letter}2"].fill = kpi_fill
-
-    ws[f"{col_letter}1"].font = Font(bold=True, color="FFFFFF")
-    ws[f"{col_letter}2"].font = Font(bold=True, color="FFFFFF")
-
-    ws[f"{col_letter}1"].alignment = Alignment(horizontal="center")
-    ws[f"{col_letter}2"].alignment = Alignment(horizontal="center")
-
-    ws[f"{col_letter}2"].number_format = '#,##0.00 "EGP"'
-
-    ws.column_dimensions[col_letter].width = 26
+        ws.column_dimensions[col_letter].width = 26
 
     # =====================================================
     # PERFORMANCE TABLE
@@ -216,7 +212,7 @@ for i, (title, value) in enumerate(zip(kpi_titles, kpi_values)):
             for c in range(1, 10):
                 ws.cell(row=r, column=c).fill = stripe_fill
 
-    # Currency Formatting
+    # Currency formatting
     for col in [4, 5, 6, 7, 9]:
         for r in range(header_row + 1, last_row + 1):
             ws.cell(row=r, column=col).number_format = '#,##0.00 "EGP"'
