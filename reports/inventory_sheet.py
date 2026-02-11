@@ -1,25 +1,23 @@
 # reports/inventory_sheet.py
 
 from openpyxl.styles import Font
-from utils.excel_helpers import auto_fit_columns
+from utils.excel_helpers import (
+    auto_fit_columns,
+    apply_header_style,
+    get_status_fill,
+    format_money_cell
+)
 from core.kpi_engine import calculate_status
 
 
 def create_inventory_sheet_single(
     wb,
-    brand_name: str,
-    mode: str,
+    brand_name,
+    mode,
     brand_inventory,
     brand_sales,
-    has_deal: bool
+    has_deal
 ):
-    """
-    Create Inventory sheet for single branch mode.
-
-    Returns:
-        total_inventory_qty,
-        total_inventory_value
-    """
 
     ws = wb.create_sheet("Inventory")
 
@@ -34,14 +32,13 @@ def create_inventory_sheet_single(
     ]
 
     ws.append(headers)
-
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
+    apply_header_style(ws)
 
     total_inventory_qty = 0
     total_inventory_value = 0
 
     for _, row in brand_inventory.iterrows():
+
         barcode = row.get("barcode")
         qty = row.get("available_quantity", 0)
         price = row.get("unit_price", 0)
@@ -51,9 +48,9 @@ def create_inventory_sheet_single(
         ]["quantity"].sum()
 
         status = calculate_status(
-            sales_qty=sales_qty,
-            inventory_qty=qty,
-            has_deal=has_deal
+            sales_qty,
+            qty,
+            has_deal
         )
 
         ws.append([
@@ -65,6 +62,9 @@ def create_inventory_sheet_single(
             qty,
             status
         ])
+
+        format_money_cell(ws.cell(row=ws.max_row, column=5))
+        ws.cell(row=ws.max_row, column=7).fill = get_status_fill(status)
 
         total_inventory_qty += qty
         total_inventory_value += qty * price
