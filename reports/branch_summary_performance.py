@@ -1,10 +1,8 @@
 from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.worksheet.table import Table, TableStyleInfo
 from utils.excel_helpers import auto_fit_columns
-import pandas as pd
 
 
-def create_branch_performance_sheet(
+def create_performance_sheet(
     wb,
     branch_name,
     payout_cycle,
@@ -16,110 +14,120 @@ def create_branch_performance_sheet(
     ws = wb.create_sheet("Performance")
 
     # =====================================================
-    # KPI CARDS (2 CARDS SIDE BY SIDE)
+    # GROUP SALES PER BRAND
     # =====================================================
 
-    total_sales_money = sales_df["total"].sum()
-    total_sales_qty = sales_df["quantity"].sum()
+    sales_grouped = (
+        sales_df.groupby("brand")
+        .agg({
+            "quantity": "sum",
+            "total": "sum"
+        })
+        .reset_index()
+    )
 
-    total_percentage_deduction = 0
-    total_rent_deduction = 0
+    sales_grouped = sales_grouped.sort_values(
+        by="total",
+        ascending=False
+    ).reset_index(drop=True)
 
-    for brand in sales_df["brand"].unique():
-        brand_sales = sales_df[sales_df["brand"] == brand]
-        brand_total = brand_sales["total"].sum()
+    sales_grouped["Rank"] = sales_grouped.index + 1
+
+    # =====================================================
+    # GROUP INVENTORY PER BRAND (FIXED)
+    # =====================================================
+
+    inventory_grouped = (
+        inventory_df.groupby("brand")
+        .agg({
+            "available_quantity": "sum",
+            "sale_price": "mean"
+        })
+        .reset_index()
+    )
+
+    inventory_grouped["inventory_value"] = (
+        inventory_grouped["available_quantity"] *
+        inventory_grouped["sale_price"]
+    )
+
+    # =====================================================
+    # MERGE CORRECTLY ON BRAND
+    # =====================================================
+
+    summary_df = sales_grouped.merge(
+        inventory_grouped,
+        on="brand",
+        how="left"
+    )
+
+    summary_df["available_quantity"] = summary_df["available_quantity"].fillna(0)
+    summary_df["inventory_value"] = summary_df["inventory_value"].fillna(0)
+
+    # =====================================================
+    # APPLY DEALS
+    # =====================================================
+
+    after_percentage_list = []
+    after_rent_list = []
+    after_all_list = []
+
+    for _, row in summary_df.iterrows():
+
+        brand = row["brand"]
+        sales_money = row["total"]
 
         deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
 
-        total_percentage_deduction += brand_total * (deal["percentage"] / 100)
-        total_rent_deduction += deal["rent"]
+        percentage = deal["percentage"]
+        rent = deal["rent"]
 
-    after_all = (
-        total_sales_money
-        - total_percentage_deduction
-        - total_rent_deduction
+        after_percentage = sales_money - (sales_money * percentage / 100)
+        after_rent = after_percentage - rent
+
+        after_percentage_list.append(after_percentage)
+        after_rent_list.append(after_rent)
+        after_all_list.append(after_rent)
+
+    summary_df["after_percentage"] = after_percentage_list
+    summary_df["after_rent"] = after_rent_list
+    summary_df["after_all"] = after_all_list
+
+    # =====================================================
+    # KPI CARDS (ONLY 2 SIDE BY SIDE)
+    # =====================================================
+
+    total_sales_money = summary_df["total"].sum()
+    total_after_all = summary_df["after_all"].sum()
+
+    kpi_fill = PatternFill(
+        start_color="0A1F5C",
+        end_color="0A1F5C",
+        fill_type="solid"
     )
 
-    # Card Style
-    card_fill = PatternFill(start_color="0A1F5C", end_color="0A1F5C", fill_type="solid")
-
-    # Card 1
     ws["A1"] = "Total Branch Sales"
     ws["A2"] = total_sales_money
-    ws["A2"].number_format = '#,##0.00 "EGP"'
 
-    # Card 2
-    ws["C1"] = "Sales After All Deductions"
-    ws["C2"] = after_all
-    ws["C2"].number_format = '#,##0.00 "EGP"'
+    ws["B1"] = "Sales After All Deductions"
+    ws["B2"] = total_after_all
 
-    for col in ["A", "C"]:
-        for row in [1, 2]:
-            cell = ws[f"{col}{row}"]
-            cell.fill = card_fill
-            cell.font = Font(color="FFFFFF", bold=True)
-            cell.alignment = Alignment(horizontal="center")
-
-    ws.row_dimensions[1].height = 25
-    ws.row_dimensions[2].height = 25
+    for col in ["A", "B"]:
+        ws[f"{col}1"].fill = kpi_fill
+        ws[f"{col}2"].fill = kpi_fill
+        ws[f"{col}1"].font = Font(bold=True, color="FFFFFF")
+        ws[f"{col}2"].font = Font(bold=True, color="FFFFFF")
+        ws[f"{col}1"].alignment = Alignment(horizontal="center")
+        ws[f"{col}2"].alignment = Alignment(horizontal="center")
+        ws[f"{col}2"].number_format = '#,##0.00 "EGP"'
+        ws.column_dimensions[col].width = 28
 
     # =====================================================
     # PERFORMANCE TABLE
     # =====================================================
 
-    start_row = 5
-
-    table_data = []
-
-    brands = sales_df["brand"].unique()
-
-    for brand in brands:
-
-        brand_sales = sales_df[sales_df["brand"] == brand]
-        brand_inventory = inventory_df[inventory_df["brand"] == brand]
-
-        sales_qty = brand_sales["quantity"].sum()
-        sales_money = brand_sales["total"].sum()
-
-        deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
-
-        after_percentage = sales_money - (sales_money * deal["percentage"] / 100)
-        after_rent = after_percentage - deal["rent"]
-        after_all = after_rent
-
-        inventory_qty = brand_inventory["available_quantity"].sum()
-        inventory_value = (
-            brand_inventory["available_quantity"]
-            * brand_inventory["sale_price"]
-        ).sum()
-
-        table_data.append([
-            brand,
-            sales_qty,
-            sales_money,
-            after_percentage,
-            after_rent,
-            after_all,
-            inventory_qty,
-            inventory_value
-        ])
-
-    df = pd.DataFrame(
-        table_data,
-        columns=[
-            "Brand",
-            "Sales Qty",
-            "Sales Money",
-            "After Percentage",
-            "After Rent",
-            "After All Deductions",
-            "Inventory Qty",
-            "Inventory Value"
-        ]
-    )
-
-    df = df.sort_values(by="Sales Money", ascending=False).reset_index(drop=True)
-    df.insert(0, "Rank", df.index + 1)
+    ws.append([])
+    ws.append([])
 
     headers = [
         "Rank",
@@ -133,12 +141,15 @@ def create_branch_performance_sheet(
         "Inventory Value"
     ]
 
-    ws.append([])
     ws.append(headers)
 
-    header_row = start_row
+    header_row = ws.max_row
 
-    header_fill = PatternFill(start_color="0A1F5C", end_color="0A1F5C", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="0A1F5C",
+        end_color="0A1F5C",
+        fill_type="solid"
+    )
 
     for col in range(1, len(headers) + 1):
         cell = ws.cell(row=header_row, column=col)
@@ -146,29 +157,35 @@ def create_branch_performance_sheet(
         cell.font = Font(bold=True, color="FFFFFF")
         cell.alignment = Alignment(horizontal="center")
 
-    for _, row in df.iterrows():
-        ws.append(row.tolist())
+    for _, row in summary_df.iterrows():
+        ws.append([
+            row["Rank"],
+            row["brand"],
+            row["quantity"],
+            row["total"],
+            row["after_percentage"],
+            row["after_rent"],
+            row["after_all"],
+            row["available_quantity"],
+            row["inventory_value"]
+        ])
 
-    end_row = ws.max_row
+    last_row = ws.max_row
 
-    table = Table(
-        displayName="BranchPerformance",
-        ref=f"A{header_row}:I{end_row}"
+    stripe_fill = PatternFill(
+        start_color="E9EEF7",
+        end_color="E9EEF7",
+        fill_type="solid"
     )
 
-    style = TableStyleInfo(
-        name="TableStyleMedium2",
-        showRowStripes=True
-    )
+    for r in range(header_row + 1, last_row + 1):
+        if r % 2 == 0:
+            for c in range(1, 10):
+                ws.cell(row=r, column=c).fill = stripe_fill
 
-    table.tableStyleInfo = style
-    ws.add_table(table)
-
-    # Number Formatting
-    money_cols = [4, 5, 6, 7, 9]
-    for col in money_cols:
-        for row in ws.iter_rows(min_row=header_row + 1, min_col=col, max_col=col):
-            for cell in row:
-                cell.number_format = '#,##0.00 "EGP"'
+    # Currency Formatting
+    for col in [4, 5, 6, 7, 9]:
+        for r in range(header_row + 1, last_row + 1):
+            ws.cell(row=r, column=col).number_format = '#,##0.00 "EGP"'
 
     auto_fit_columns(ws)
