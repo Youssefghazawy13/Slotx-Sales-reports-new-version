@@ -36,7 +36,7 @@ def detect_barcode_col(df):
     return None
 
 
-def load_brand_deals(deals_file, mode: str):
+def load_brand_deals(deals_file, mode):
 
     try:
         deals_df = pd.read_excel(deals_file, sheet_name=mode)
@@ -62,7 +62,11 @@ def load_brand_deals(deals_file, mode: str):
         return None, str(e)
 
 
-def build_reports_zip(brand_workbooks):
+# ==========================================================
+# ZIP BUILDER
+# ==========================================================
+
+def build_reports_zip(brand_workbooks, mode):
 
     zip_buffer = BytesIO()
 
@@ -72,6 +76,7 @@ def build_reports_zip(brand_workbooks):
 
             buffer = data["buffer"]
             has_sales = data["has_sales"]
+            has_deal = data["has_deal"]
 
             if buffer is None:
                 continue
@@ -83,10 +88,16 @@ def build_reports_zip(brand_workbooks):
                 .replace(":", "-")
             )
 
-            if has_sales:
-                path = f"Reports/{safe_name}.xlsx"
+            base_folder = f"Reports/{mode}"
+
+            if not has_sales:
+                path = f"{base_folder}/Empty Brand Guard/{safe_name}.xlsx"
+
+            elif not has_deal:
+                path = f"{base_folder}/No Deals/{safe_name}.xlsx"
+
             else:
-                path = f"Reports/Empty Brand Guard/{safe_name}.xlsx"
+                path = f"{base_folder}/{safe_name}.xlsx"
 
             zip_file.writestr(path, buffer.getvalue())
 
@@ -192,7 +203,8 @@ if st.button("Generate Reports"):
 
             brand_workbooks[brand] = {
                 "buffer": workbook_buffer,
-                "has_sales": not brand_sales.empty
+                "has_sales": not brand_sales.empty,
+                "has_deal": brand in deals_dict
             }
 
     # ======================================================
@@ -257,35 +269,25 @@ if st.button("Generate Reports"):
                 zam_inv.rename(columns={inv_barcode_col_zam: "barcode"}, inplace=True)
 
             if not alex_inv.empty and not zam_inv.empty:
-
                 brand_inventory = pd.merge(
                     alex_inv,
                     zam_inv,
                     on="barcode",
                     how="outer"
                 )
-
             elif not alex_inv.empty:
                 brand_inventory = alex_inv.copy()
                 brand_inventory["zamalek_qty"] = 0
-
             elif not zam_inv.empty:
                 brand_inventory = zam_inv.copy()
                 brand_inventory["alex_qty"] = 0
-
             else:
                 brand_inventory = pd.DataFrame()
 
             if not brand_inventory.empty:
 
-                if "alex_qty" not in brand_inventory.columns:
-                    brand_inventory["alex_qty"] = 0
-
-                if "zamalek_qty" not in brand_inventory.columns:
-                    brand_inventory["zamalek_qty"] = 0
-
-                brand_inventory["alex_qty"] = brand_inventory["alex_qty"].fillna(0)
-                brand_inventory["zamalek_qty"] = brand_inventory["zamalek_qty"].fillna(0)
+                brand_inventory["alex_qty"] = brand_inventory.get("alex_qty", 0).fillna(0)
+                brand_inventory["zamalek_qty"] = brand_inventory.get("zamalek_qty", 0).fillna(0)
 
                 brand_inventory["quantity"] = (
                     brand_inventory["alex_qty"] +
@@ -306,10 +308,11 @@ if st.button("Generate Reports"):
 
             brand_workbooks[brand] = {
                 "buffer": workbook_buffer,
-                "has_sales": not brand_sales.empty
+                "has_sales": not brand_sales.empty,
+                "has_deal": brand in deals_dict
             }
 
-    zip_buffer = build_reports_zip(brand_workbooks)
+    zip_buffer = build_reports_zip(brand_workbooks, mode)
 
     st.success("Reports generated successfully!")
 
