@@ -17,23 +17,16 @@ def auto_fit(ws):
 def create_sales_sheet(wb, brand_sales, mode):
     ws = wb.create_sheet("Sales")
 
-    header_fill = PatternFill(
-        start_color="1F4E78",
-        end_color="1F4E78",
-        fill_type="solid"
-    )
+    # ====== COLORS (نفس inventory) ======
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    row_fill_1 = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    row_fill_2 = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
 
-    header_font = Font(
-        bold=True,
-        color="FFFFFF"
-    )
+    header_font = Font(bold=True, color="FFFFFF")
+    normal_font = Font(bold=False)
 
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin")
-    )
+    thin = Side(style="thin")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     headers = [
         "Branch",
@@ -46,17 +39,20 @@ def create_sales_sheet(wb, brand_sales, mode):
 
     ws.append(headers)
 
+    # ===== HEADER STYLE =====
     for col in range(1, len(headers) + 1):
         cell = ws.cell(row=1, column=col)
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = thin_border
+        cell.border = border
 
     total_qty = 0
     total_money = 0
+    current_row = 2
 
-    for _, row in brand_sales.iterrows():
+    # ===== DATA ROWS =====
+    for index, row in brand_sales.iterrows():
         qty = row.get("quantity", 0)
         price = row.get("total", 0)
 
@@ -64,7 +60,7 @@ def create_sales_sheet(wb, brand_sales, mode):
         total_money += price
 
         ws.append([
-            mode,  # ده كان branch_name
+            mode,
             row.get("brand", ""),
             row.get("product_name", ""),
             row.get("barcode", ""),
@@ -72,16 +68,34 @@ def create_sales_sheet(wb, brand_sales, mode):
             f"{price:,.2f} EGP"
         ])
 
-    total_row_index = ws.max_row + 1
+        fill = row_fill_1 if current_row % 2 == 0 else row_fill_2
 
-    ws.cell(row=total_row_index, column=5).value = f"Total={int(total_qty)}"
-    ws.cell(row=total_row_index, column=6).value = f"Total={total_money:,.2f} EGP"
+        for col in range(1, 7):
+            cell = ws.cell(row=current_row, column=col)
+            cell.fill = fill
+            cell.font = normal_font
+            cell.border = border
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        current_row += 1
+
+    # ===== TOTAL ROW (نفس ستايل الجدول) =====
+    ws.append([
+        "",
+        "",
+        "",
+        "",
+        f"Total={int(total_qty)}",
+        f"Total={total_money:,.2f} EGP"
+    ])
+
+    fill = row_fill_1 if current_row % 2 == 0 else row_fill_2
 
     for col in range(1, 7):
-        cell = ws.cell(row=total_row_index, column=col)
-        cell.fill = header_fill
-        cell.font = header_font
+        cell = ws.cell(row=current_row, column=col)
+        cell.fill = fill
+        cell.font = Font(bold=True)
+        cell.border = border
         cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = thin_border
 
     auto_fit(ws)
