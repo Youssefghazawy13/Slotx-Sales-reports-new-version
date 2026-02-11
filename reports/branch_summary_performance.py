@@ -94,33 +94,66 @@ def create_performance_sheet(
     summary_df["after_all"] = after_all_list
 
     # =====================================================
-    # KPI CARDS (ONLY 2 SIDE BY SIDE)
-    # =====================================================
+# KPI CARDS (5 SIDE BY SIDE)
+# =====================================================
 
-    total_sales_money = summary_df["total"].sum()
-    total_after_all = summary_df["after_all"].sum()
+total_sales_money = summary_df["total"].sum()
 
-    kpi_fill = PatternFill(
-        start_color="0A1F5C",
-        end_color="0A1F5C",
-        fill_type="solid"
-    )
+total_percentage_deduction = (
+    summary_df["total"] - summary_df["after_percentage"]
+).sum()
 
-    ws["A1"] = "Total Branch Sales"
-    ws["A2"] = total_sales_money
+total_rent_deduction = (
+    summary_df["after_percentage"] - summary_df["after_rent"]
+).sum()
 
-    ws["B1"] = "Sales After All Deductions"
-    ws["B2"] = total_after_all
+total_after_all = summary_df["after_all"].sum()
 
-    for col in ["A", "B"]:
-        ws[f"{col}1"].fill = kpi_fill
-        ws[f"{col}2"].fill = kpi_fill
-        ws[f"{col}1"].font = Font(bold=True, color="FFFFFF")
-        ws[f"{col}2"].font = Font(bold=True, color="FFFFFF")
-        ws[f"{col}1"].alignment = Alignment(horizontal="center")
-        ws[f"{col}2"].alignment = Alignment(horizontal="center")
-        ws[f"{col}2"].number_format = '#,##0.00 "EGP"'
-        ws.column_dimensions[col].width = 28
+total_deductions = (
+    total_percentage_deduction + total_rent_deduction
+)
+
+kpi_fill = PatternFill(
+    start_color="0A1F5C",
+    end_color="0A1F5C",
+    fill_type="solid"
+)
+
+kpi_titles = [
+    "Total Branch Sales",
+    "Total % Deducted",
+    "Total Rent Deducted",
+    "Total Deductions",
+    "Sales After All Deductions"
+]
+
+kpi_values = [
+    total_sales_money,
+    total_percentage_deduction,
+    total_rent_deduction,
+    total_deductions,
+    total_after_all
+]
+
+for i, (title, value) in enumerate(zip(kpi_titles, kpi_values)):
+
+    col_letter = chr(65 + i)  # A, B, C, D, E
+
+    ws[f"{col_letter}1"] = title
+    ws[f"{col_letter}2"] = value
+
+    ws[f"{col_letter}1"].fill = kpi_fill
+    ws[f"{col_letter}2"].fill = kpi_fill
+
+    ws[f"{col_letter}1"].font = Font(bold=True, color="FFFFFF")
+    ws[f"{col_letter}2"].font = Font(bold=True, color="FFFFFF")
+
+    ws[f"{col_letter}1"].alignment = Alignment(horizontal="center")
+    ws[f"{col_letter}2"].alignment = Alignment(horizontal="center")
+
+    ws[f"{col_letter}2"].number_format = '#,##0.00 "EGP"'
+
+    ws.column_dimensions[col_letter].width = 26
 
     # =====================================================
     # PERFORMANCE TABLE
