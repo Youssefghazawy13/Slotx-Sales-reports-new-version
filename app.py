@@ -57,7 +57,6 @@ def remove_refunds_and_original_sales(sales_df):
 # =========================================================
 
 mode = st.selectbox("Select Mode", ["Zamalek", "Alexandria", "Merged"])
-
 payout_cycle = st.selectbox("Select Payout Cycle", ["Cycle 1", "Cycle 2"])
 
 st.divider()
@@ -112,6 +111,25 @@ if st.button("Generate Reports"):
 
             inv_alex = pd.read_excel(inventory_alex_file)
 
+            # 🔥🔥🔥 الإصلاح الحقيقي هنا 🔥🔥🔥
+
+            # تنظيف الأعمدة
+            inv_zam.columns = inv_zam.columns.str.strip()
+            inv_alex.columns = inv_alex.columns.str.strip()
+
+            # توحيد اسم البراند
+            inv_zam["brand"] = inv_zam["brand"].astype(str).str.strip().str.title()
+            inv_alex["brand"] = inv_alex["brand"].astype(str).str.strip().str.title()
+
+            # تحويل الكمية لأرقام حقيقية
+            inv_zam["available_quantity"] = pd.to_numeric(
+                inv_zam["available_quantity"], errors="coerce"
+            ).fillna(0)
+
+            inv_alex["available_quantity"] = pd.to_numeric(
+                inv_alex["available_quantity"], errors="coerce"
+            ).fillna(0)
+
             deals_merged = load_deals_by_mode(deals_file, "Merged")
             deals_zam = load_deals_by_mode(deals_file, "Zamalek")
             deals_alex = load_deals_by_mode(deals_file, "Alexandria")
@@ -126,14 +144,12 @@ if st.button("Generate Reports"):
                 zam_inv_brand = inv_zam[inv_zam["brand"] == brand]
                 alex_inv_brand = inv_alex[inv_alex["brand"] == brand]
 
-                # 🔥 نحسب الكميات لكل فرع فقط
                 zam_qty = zam_inv_brand["available_quantity"].sum()
                 alex_qty = alex_inv_brand["available_quantity"].sum()
 
                 if zam_qty == 0 and alex_qty == 0:
                     continue
 
-                # تحديد نوع البراند حسب inventory فقط
                 if alex_qty > 0 and zam_qty > 0:
                     branch_type = "Merged"
                     deals_dict = deals_merged
@@ -162,7 +178,6 @@ if st.button("Generate Reports"):
 
                 deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
 
-                # 🔥 Empty Guard Logic صحيح
                 if total_sales_qty == 0 and total_inventory_qty > 0:
                     subfolder = "Empty Brand Guard"
                 elif deal["percentage"] == 0 and deal["rent"] == 0:
@@ -189,7 +204,7 @@ if st.button("Generate Reports"):
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
         # =====================================================
-        # SINGLE MODE
+        # SINGLE MODE (بدون تغيير)
         # =====================================================
 
         else:
@@ -247,7 +262,6 @@ if st.button("Generate Reports"):
 
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
-            # Summary only in single branch
             summary_wb = build_branch_summary_workbook(
                 branch_name=mode,
                 payout_cycle=payout_cycle,
