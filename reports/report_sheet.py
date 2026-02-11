@@ -1,7 +1,7 @@
 # reports/report_sheet.py
 
 from openpyxl.styles import Font
-from utils.excel_helpers import auto_fit_columns
+from utils.excel_helpers import auto_fit_columns, format_money_cell
 from core.kpi_engine import (
     get_best_selling_product,
     get_best_selling_size,
@@ -22,13 +22,9 @@ def create_report_sheet(
     total_sales_money: float,
     deals_dict: dict
 ):
-    """
-    Create Executive Summary Report sheet.
-    """
 
     ws = wb.create_sheet("Report")
 
-    # Deal info
     deal_text = generate_deal_text(brand_name, deals_dict)
 
     percentage = deals_dict.get(brand_name, {}).get("percentage", 0)
@@ -64,10 +60,22 @@ def create_report_sheet(
     for row in report_data:
         ws.append(row)
 
-    # Bold first column labels
+    # Bold only first column (labels)
     for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=1):
         for cell in row:
             if cell.value:
                 cell.font = Font(bold=True)
+
+    # Format money fields
+    money_rows = [
+        "Total Inventory Stock Value:",
+        "Total Sales Money:",
+        "After Percentage:",
+        "After Rent:"
+    ]
+
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
+        if row[0].value in money_rows:
+            format_money_cell(row[1])
 
     auto_fit_columns(ws)
