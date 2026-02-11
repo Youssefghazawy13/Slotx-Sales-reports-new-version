@@ -1,4 +1,4 @@
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font
 from utils.excel_helpers import auto_fit_columns
 
 
@@ -18,14 +18,9 @@ def create_inventory_sheet(wb, brand_inventory, mode):
 
     ws = wb.create_sheet("Inventory")
 
-    if brand_inventory.empty:
-        ws.append(["No Inventory Data"])
-        return
-
     is_merged = mode.lower() == "merged"
 
     if is_merged:
-
         headers = [
             "Product",
             "Barcode",
@@ -36,9 +31,7 @@ def create_inventory_sheet(wb, brand_inventory, mode):
             "Status",
             "Notes"
         ]
-
     else:
-
         headers = [
             "Product",
             "Barcode",
@@ -63,7 +56,7 @@ def create_inventory_sheet(wb, brand_inventory, mode):
 
             alex = row.get("alex_qty", 0)
             zam = row.get("zamalek_qty", 0)
-            total = alex + zam
+            total = row.get("available_quantity", 0)
 
             status = get_status(total)
 
