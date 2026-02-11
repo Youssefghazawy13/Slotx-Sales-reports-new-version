@@ -30,20 +30,21 @@ def create_report_sheet(
     )
 
     # =====================================================
-    # SMALL KPI CARDS (SLIM DESIGN)
+    # SMALL KPI CARDS (START FROM ROW 1)
     # =====================================================
 
     def create_kpi_card(row, col, title, value):
 
         ws.merge_cells(start_row=row, start_column=col,
-                       end_row=row, end_column=col+2)
+                       end_row=row+2, end_column=col+1)
 
         cell = ws.cell(row=row, column=col)
-        cell.value = f"{title}: {value}"
+        cell.value = f"{title}\n{value}"
 
-        cell.font = Font(size=11, bold=True, color="FFFFFF")
+        cell.font = Font(size=12, bold=True, color="FFFFFF")
         cell.alignment = Alignment(horizontal="center",
-                                   vertical="center")
+                                   vertical="center",
+                                   wrap_text=True)
 
         fill = PatternFill(
             start_color="0A1F5C",
@@ -58,101 +59,104 @@ def create_report_sheet(
             bottom=Side(style="thin")
         )
 
-        for c in range(col, col+3):
-            ws.cell(row=row, column=c).fill = fill
-            ws.cell(row=row, column=c).border = border
+        for r in range(row, row+3):
+            for c in range(col, col+2):
+                ws.cell(row=r, column=c).fill = fill
+                ws.cell(row=r, column=c).border = border
 
-    create_kpi_card(2, 1, "Total Sales",
+    create_kpi_card(1, 1, "Total Sales",
                     f"{total_sales_money:,.2f} EGP")
 
-    create_kpi_card(2, 5, "Net After Deal",
+    create_kpi_card(1, 4, "Net After Deal",
                     f"{after_rent:,.2f} EGP")
 
-    create_kpi_card(2, 9, "Inventory Units",
+    create_kpi_card(1, 7, "Inventory Units",
                     total_inventory_qty)
 
     # =====================================================
-    # REPORT DETAILS BELOW KPIs
+    # REPORT STRUCTURE BELOW
     # =====================================================
 
-    start_row = 5
+    row_pointer = 5
 
-    ws.cell(row=start_row, column=1,
+    ws.cell(row=row_pointer, column=1,
             value="Branch Name:").font = Font(bold=True)
-    ws.cell(row=start_row, column=2, value=mode)
+    ws.cell(row=row_pointer, column=2, value=mode)
 
-    ws.cell(row=start_row+1, column=1,
+    ws.cell(row=row_pointer+1, column=1,
             value="Brand Name:").font = Font(bold=True)
-    ws.cell(row=start_row+1, column=2, value=brand_name)
+    ws.cell(row=row_pointer+1, column=2, value=brand_name)
 
-    ws.cell(row=start_row+2, column=1,
+    ws.cell(row=row_pointer+2, column=1,
             value="Payout Cycle:").font = Font(bold=True)
-    ws.cell(row=start_row+2, column=2, value=payout_cycle)
+    ws.cell(row=row_pointer+2, column=2, value=payout_cycle)
 
-    ws.cell(row=start_row+3, column=1,
-            value="Total Sales Quantity:").font = Font(bold=True)
-    ws.cell(row=start_row+3, column=2, value=total_sales_qty)
+    # Skip 2 rows
+    row_pointer += 5
 
-    ws.cell(row=start_row+4, column=1,
-            value="Total Sales Money:").font = Font(bold=True)
-    ws.cell(row=start_row+4, column=2,
-            value=f"{total_sales_money:,.2f} EGP")
-
-    ws.cell(row=start_row+5, column=1,
+    ws.cell(row=row_pointer, column=1,
             value="Total Inventory Quantity:").font = Font(bold=True)
-    ws.cell(row=start_row+5, column=2, value=total_inventory_qty)
+    ws.cell(row=row_pointer, column=2, value=total_inventory_qty)
 
-    ws.cell(row=start_row+6, column=1,
+    ws.cell(row=row_pointer+1, column=1,
             value="Total Inventory Value:").font = Font(bold=True)
-    ws.cell(row=start_row+6, column=2,
+    ws.cell(row=row_pointer+1, column=2,
             value=f"{total_inventory_value:,.2f} EGP")
 
-    ws.cell(row=start_row+7, column=1,
-            value="After Percentage:").font = Font(bold=True)
-    ws.cell(row=start_row+7, column=2,
-            value=f"{after_percentage:,.2f} EGP")
+    # Skip 2 rows
+    row_pointer += 4
 
-    ws.cell(row=start_row+8, column=1,
-            value="After Rent:").font = Font(bold=True)
-    ws.cell(row=start_row+8, column=2,
-            value=f"{after_rent:,.2f} EGP")
-
-    # =====================================================
-    # TOP PRODUCTS PERFORMANCE
-    # =====================================================
-
-    top_start = start_row + 11
-
-    ws.cell(row=top_start, column=1,
-            value="Top Products Performance").font = Font(size=13, bold=True)
-
-    ws.cell(row=top_start+1, column=1,
-            value="Product").font = Font(bold=True)
-    ws.cell(row=top_start+1, column=2,
-            value="Quantity").font = Font(bold=True)
-    ws.cell(row=top_start+1, column=3,
-            value="Sales").font = Font(bold=True)
-
+    # Best Selling Products (Top 2)
     product_sales = (
         brand_sales.groupby("product_name")["quantity"]
         .sum()
         .sort_values(ascending=False)
-        .head(3)
+        .head(2)
     )
 
-    row_pointer = top_start + 2
-
+    best_products_text = ""
     for product, qty in product_sales.items():
+        best_products_text += f"{product} ({qty})  "
 
-        revenue = brand_sales[
-            brand_sales["product_name"] == product
-        ]["total"].sum()
+    ws.cell(row=row_pointer, column=1,
+            value="Best Selling Products:").font = Font(bold=True)
+    ws.cell(row=row_pointer, column=2, value=best_products_text)
 
-        ws.cell(row=row_pointer, column=1, value=product)
-        ws.cell(row=row_pointer, column=2, value=qty)
-        ws.cell(row=row_pointer, column=3,
-                value=f"{revenue:,.2f} EGP")
+    # Best Selling Size
+    best_size = ""
+    if "size" in brand_sales.columns:
+        size_sales = (
+            brand_sales.groupby("size")["quantity"]
+            .sum()
+            .sort_values(ascending=False)
+        )
+        if not size_sales.empty:
+            best_size = size_sales.index[0]
 
-        row_pointer += 1
+    ws.cell(row=row_pointer+1, column=1,
+            value="Best Selling Size:").font = Font(bold=True)
+    ws.cell(row=row_pointer+1, column=2, value=best_size)
+
+    # Skip 2 rows
+    row_pointer += 4
+
+    ws.cell(row=row_pointer, column=1,
+            value="Total Sales Quantity:").font = Font(bold=True)
+    ws.cell(row=row_pointer, column=2, value=total_sales_qty)
+
+    ws.cell(row=row_pointer+1, column=1,
+            value="Total Sales Money:").font = Font(bold=True)
+    ws.cell(row=row_pointer+1, column=2,
+            value=f"{total_sales_money:,.2f} EGP")
+
+    ws.cell(row=row_pointer+2, column=1,
+            value="After Percentage:").font = Font(bold=True)
+    ws.cell(row=row_pointer+2, column=2,
+            value=f"{after_percentage:,.2f} EGP")
+
+    ws.cell(row=row_pointer+3, column=1,
+            value="After Rent:").font = Font(bold=True)
+    ws.cell(row=row_pointer+3, column=2,
+            value=f"{after_rent:,.2f} EGP")
 
     auto_fit_columns(ws)
