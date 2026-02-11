@@ -14,10 +14,9 @@ def auto_fit(ws):
         ws.column_dimensions[col_letter].width = max_length + 3
 
 
-def create_sales_sheet(wb, brand_sales, branch_name):
+def create_sales_sheet(wb, brand_sales, mode):
     ws = wb.create_sheet("Sales")
 
-    # ===== HEADER STYLE =====
     header_fill = PatternFill(
         start_color="1F4E78",
         end_color="1F4E78",
@@ -54,7 +53,6 @@ def create_sales_sheet(wb, brand_sales, branch_name):
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = thin_border
 
-    # ===== DATA ROWS =====
     total_qty = 0
     total_money = 0
 
@@ -66,7 +64,7 @@ def create_sales_sheet(wb, brand_sales, branch_name):
         total_money += price
 
         ws.append([
-            branch_name,
+            mode,  # ده كان branch_name
             row.get("brand", ""),
             row.get("product_name", ""),
             row.get("barcode", ""),
@@ -74,7 +72,6 @@ def create_sales_sheet(wb, brand_sales, branch_name):
             f"{price:,.2f} EGP"
         ])
 
-    # ===== TOTAL ROW INSIDE TABLE =====
     total_row_index = ws.max_row + 1
 
     ws.cell(row=total_row_index, column=5).value = f"Total={int(total_qty)}"
