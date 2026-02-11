@@ -27,7 +27,6 @@ def extract_best_selling_size(brand_sales):
     size_sales = {}
 
     for _, row in brand_sales.iterrows():
-
         product_name = str(row.get("name_ar", ""))
         qty = row.get("quantity", 0)
 
@@ -39,6 +38,18 @@ def extract_best_selling_size(brand_sales):
         return ""
 
     return max(size_sales, key=size_sales.get)
+
+
+def format_brand_deal(percentage, rent):
+
+    if percentage > 0 and rent > 0:
+        return f"{percentage}% + {rent:,.2f} EGP Deducted from sales"
+    elif percentage > 0:
+        return f"{percentage}% Deducted from sales"
+    elif rent > 0:
+        return f"{rent:,.2f} EGP Deducted from sales"
+    else:
+        return "No Deal"
 
 
 def create_report_sheet(
@@ -61,34 +72,20 @@ def create_report_sheet(
     total_sales_money = brand_sales["total"].sum() if not brand_sales.empty else 0
 
     if not brand_inventory.empty:
-
-        brand_inventory["sale_price"] = (
-            brand_inventory["sale_price"]
-            .fillna(0)
-            .astype(float)
-        )
-
-        brand_inventory["available_quantity"] = (
-            brand_inventory["available_quantity"]
-            .fillna(0)
-            .astype(float)
-        )
-
         total_inventory_qty = brand_inventory["available_quantity"].sum()
 
         total_inventory_value = (
             brand_inventory["sale_price"] *
             brand_inventory["available_quantity"]
         ).sum()
-
     else:
         total_inventory_qty = 0
         total_inventory_value = 0
 
     deal = deals_dict.get(brand_name, {"percentage": 0, "rent": 0})
 
-    percentage = deal["percentage"]
-    rent = deal["rent"]
+    percentage = deal.get("percentage", 0)
+    rent = deal.get("rent", 0)
 
     after_percentage = total_sales_money - (total_sales_money * percentage / 100)
     after_rent = after_percentage - rent
@@ -96,8 +93,10 @@ def create_report_sheet(
     best_product, best_qty = extract_best_selling_product(brand_sales)
     best_size = extract_best_selling_size(brand_sales)
 
+    deal_text = format_brand_deal(percentage, rent)
+
     # =========================
-    # KPI CARDS (B & C)
+    # KPI CARDS (START A1)
     # =========================
 
     kpi_fill = PatternFill(
@@ -106,13 +105,14 @@ def create_report_sheet(
         fill_type="solid"
     )
 
-    ws["B1"] = "Total Sales"
-    ws["B2"] = total_sales_money
+    ws["A1"] = "Total Sales"
+    ws["A2"] = total_sales_money
 
-    ws["C1"] = "Inventory Value"
-    ws["C2"] = total_inventory_value
+    ws["B1"] = "Inventory Value"
+    ws["B2"] = total_inventory_value
 
-    for col in ["B", "C"]:
+    for col in ["A", "B"]:
+
         ws[f"{col}1"].font = Font(color="FFFFFF", bold=True)
         ws[f"{col}2"].font = Font(color="FFFFFF", bold=True)
 
@@ -122,22 +122,22 @@ def create_report_sheet(
         ws[f"{col}1"].fill = kpi_fill
         ws[f"{col}2"].fill = kpi_fill
 
-    ws["B2"].number_format = '#,##0.00'
-    ws["C2"].number_format = '#,##0.00'
+        ws.column_dimensions[col].width = 22
 
-    ws.column_dimensions["B"].width = 18
-    ws.column_dimensions["C"].width = 18
+    ws["A2"].number_format = '#,##0.00 "EGP"'
+    ws["B2"].number_format = '#,##0.00 "EGP"'
 
     # =========================
     # DETAILS SECTION
     # =========================
 
-    start_row = 5
+    row = 4
 
-    report_data = [
+    details = [
         ("Branch Name:", mode),
         ("Brand Name:", brand_name),
         ("Payout Cycle:", payout_cycle),
+        ("Brand Deal:", deal_text),
         ("", ""),
         ("Total Inventory Quantity:", total_inventory_qty),
         ("Total Inventory Value:", total_inventory_value),
@@ -151,16 +151,21 @@ def create_report_sheet(
         ("After Rent:", after_rent),
     ]
 
-    for label, value in report_data:
+    for label, value in details:
 
-        ws[f"B{start_row}"] = label
-        ws[f"C{start_row}"] = value
+        ws[f"A{row}"] = label
+        ws[f"B{row}"] = value
 
-        ws[f"B{start_row}"].font = Font(bold=True)
+        ws[f"A{row}"].font = Font(bold=True)
 
-        if isinstance(value, (int, float)):
-            ws[f"C{start_row}"].number_format = '#,##0.00'
+        if label in [
+            "Total Inventory Value:",
+            "Total Sales Money:",
+            "After Percentage:",
+            "After Rent:"
+        ]:
+            ws[f"B{row}"].number_format = '#,##0.00 "EGP"'
 
-        start_row += 1
+        row += 1
 
     auto_fit_columns(ws)
