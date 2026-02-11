@@ -16,10 +16,7 @@ def extract_best_selling_product(brand_sales):
     if grouped.empty:
         return "", 0
 
-    top_product = grouped.index[0]
-    top_qty = grouped.iloc[0]
-
-    return top_product, top_qty
+    return grouped.index[0], grouped.iloc[0]
 
 
 def extract_best_selling_size(brand_sales):
@@ -56,14 +53,13 @@ def create_report_sheet(
 
     ws = wb.create_sheet("Report")
 
-    # =====================================================
+    # =========================
     # CALCULATIONS
-    # =====================================================
+    # =========================
 
     total_sales_qty = brand_sales["quantity"].sum() if not brand_sales.empty else 0
     total_sales_money = brand_sales["total"].sum() if not brand_sales.empty else 0
 
-    # Ensure numeric
     if not brand_inventory.empty:
 
         brand_inventory["sale_price"] = (
@@ -89,7 +85,6 @@ def create_report_sheet(
         total_inventory_qty = 0
         total_inventory_value = 0
 
-    # Deals
     deal = deals_dict.get(brand_name, {"percentage": 0, "rent": 0})
 
     percentage = deal["percentage"]
@@ -101,9 +96,9 @@ def create_report_sheet(
     best_product, best_qty = extract_best_selling_product(brand_sales)
     best_size = extract_best_selling_size(brand_sales)
 
-    # =====================================================
-    # KPI CARDS (ROW 1)
-    # =====================================================
+    # =========================
+    # KPI CARDS (B & C)
+    # =========================
 
     kpi_fill = PatternFill(
         start_color="0A1F5C",
@@ -111,41 +106,31 @@ def create_report_sheet(
         fill_type="solid"
     )
 
-    # KPI 1 - Sales
     ws["B1"] = "Total Sales"
     ws["B2"] = total_sales_money
 
-    ws["B1"].font = Font(color="FFFFFF", bold=True)
-    ws["B2"].font = Font(color="FFFFFF", bold=True)
+    ws["C1"] = "Inventory Value"
+    ws["C2"] = total_inventory_value
+
+    for col in ["B", "C"]:
+        ws[f"{col}1"].font = Font(color="FFFFFF", bold=True)
+        ws[f"{col}2"].font = Font(color="FFFFFF", bold=True)
+
+        ws[f"{col}1"].alignment = Alignment(horizontal="center")
+        ws[f"{col}2"].alignment = Alignment(horizontal="center")
+
+        ws[f"{col}1"].fill = kpi_fill
+        ws[f"{col}2"].fill = kpi_fill
+
     ws["B2"].number_format = '#,##0.00'
+    ws["C2"].number_format = '#,##0.00'
 
-    ws["B1"].alignment = Alignment(horizontal="center")
-    ws["B2"].alignment = Alignment(horizontal="center")
-
-    ws["B1"].fill = kpi_fill
-    ws["B2"].fill = kpi_fill
-
-    # KPI 2 - Inventory Value
-    ws["D1"] = "Inventory Value"
-    ws["D2"] = total_inventory_value
-
-    ws["D1"].font = Font(color="FFFFFF", bold=True)
-    ws["D2"].font = Font(color="FFFFFF", bold=True)
-    ws["D2"].number_format = '#,##0.00'
-
-    ws["D1"].alignment = Alignment(horizontal="center")
-    ws["D2"].alignment = Alignment(horizontal="center")
-
-    ws["D1"].fill = kpi_fill
-    ws["D2"].fill = kpi_fill
-
-    # Fix column width for KPI
     ws.column_dimensions["B"].width = 18
-    ws.column_dimensions["D"].width = 18
+    ws.column_dimensions["C"].width = 18
 
-    # =====================================================
+    # =========================
     # DETAILS SECTION
-    # =====================================================
+    # =========================
 
     start_row = 5
 
