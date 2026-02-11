@@ -5,7 +5,7 @@ from io import BytesIO
 
 from reports.workbook_builder import build_brand_workbook
 from reports.branch_summary_workbook import build_branch_summary_workbook
-from core.deals_loader import load_branch_deals
+from core.deals_engine import load_branch_deals
 
 
 st.set_page_config(
