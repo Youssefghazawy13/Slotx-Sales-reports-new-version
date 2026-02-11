@@ -11,35 +11,20 @@ def create_performance_sheet(
     deals_dict
 ):
 
-    ws = wb.create_sheet("Performance")
+    ws = wb.create_sheet(f"{branch_name} Summary")
 
-    # ==============================
-    # AGGREGATION PER BRAND
-    # ==============================
+    # =============================
+    # AGGREGATE PER BRAND
+    # =============================
 
-    sales_grouped = (
+    grouped = (
         sales_df.groupby("brand")
-        .agg({
-            "quantity": "sum",
-            "total": "sum"
-        })
+        .agg({"quantity": "sum", "total": "sum"})
         .reset_index()
     )
 
-    sales_grouped = sales_grouped.sort_values(
-        by="total",
-        ascending=False
-    ).reset_index(drop=True)
-
-    # Ranking
-    sales_grouped["Rank"] = sales_grouped.index + 1
-
-    # ==============================
-    # INVENTORY CALCULATION
-    # ==============================
-
     inventory_grouped = (
-        inventory_df.groupby("name_en")
+        inventory_df.groupby("brand")
         .agg({
             "available_quantity": "sum",
             "sale_price": "mean"
@@ -48,68 +33,56 @@ def create_performance_sheet(
     )
 
     inventory_grouped["inventory_value"] = (
-        inventory_grouped["available_quantity"] *
-        inventory_grouped["sale_price"]
+        inventory_grouped["available_quantity"]
+        * inventory_grouped["sale_price"]
     )
 
-    # ==============================
-    # MERGE SALES + INVENTORY
-    # ==============================
-
-    summary_df = sales_grouped.merge(
+    df = grouped.merge(
         inventory_grouped,
-        left_on="brand",
-        right_on="name_en",
+        on="brand",
         how="left"
-    )
+    ).fillna(0)
 
-    summary_df["inventory_value"] = summary_df["inventory_value"].fillna(0)
-    summary_df["available_quantity"] = summary_df["available_quantity"].fillna(0)
+    total_percentage_deduction = 0
+    total_rent_deduction = 0
 
-    # ==============================
-    # APPLY DEALS
-    # ==============================
+    after_all_list = []
 
-    after_percentage_list = []
-    after_rent_list = []
-    health_list = []
-
-    for _, row in summary_df.iterrows():
+    for _, row in df.iterrows():
 
         brand = row["brand"]
         sales_money = row["total"]
 
         deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
+
         percentage = deal["percentage"]
         rent = deal["rent"]
 
-        after_percentage = sales_money - (sales_money * percentage / 100)
-        after_rent = after_percentage - rent
+        percentage_deduction = sales_money * percentage / 100
 
-        after_percentage_list.append(after_percentage)
-        after_rent_list.append(after_rent)
+        after_all = sales_money - percentage_deduction - rent
 
-        # Brand Health
-        if percentage == 0 and rent == 0:
-            health = "No Deal"
-        elif row["available_quantity"] <= 2:
-            health = "Critical"
-        else:
-            health = "Healthy"
+        total_percentage_deduction += percentage_deduction
+        total_rent_deduction += rent
 
-        health_list.append(health)
+        after_all_list.append(after_all)
 
-    summary_df["after_percentage"] = after_percentage_list
-    summary_df["after_rent"] = after_rent_list
-    summary_df["health"] = health_list
+    df["after_all"] = after_all_list
 
-    # ==============================
+    df = df.sort_values(
+        by="after_all",
+        ascending=False
+    ).reset_index(drop=True)
+
+    df["Rank"] = df.index + 1
+
+    total_sales = df["total"].sum()
+    total_inventory_value = df["inventory_value"].sum()
+    total_after_all = df["after_all"].sum()
+
+    # =============================
     # KPI CARDS
-    # ==============================
-
-    total_sales_money = summary_df["total"].sum()
-    total_inventory_value = summary_df["inventory_value"].sum()
-    total_after_rent = summary_df["after_rent"].sum()
+    # =============================
 
     kpi_fill = PatternFill(
         start_color="0A1F5C",
@@ -117,31 +90,37 @@ def create_performance_sheet(
         fill_type="solid"
     )
 
-    ws["A1"] = "Total Sales"
-    ws["A2"] = total_sales_money
+    kpis = [
+        ("Total Branch Sales", total_sales),
+        ("Total Rent Deductions", total_rent_deduction),
+        ("Total Percentage Deductions", total_percentage_deduction),
+        ("Sales After All Deductions", total_after_all),
+        ("Inventory Value", total_inventory_value),
+    ]
 
-    ws["B1"] = "Inventory Value"
-    ws["B2"] = total_inventory_value
+    row = 1
+    col = 1
 
-    ws["C1"] = "Net After Deductions"
-    ws["C2"] = total_after_rent
+    for title, value in kpis:
 
-    for col in ["A", "B", "C"]:
-        ws[f"{col}1"].fill = kpi_fill
-        ws[f"{col}2"].fill = kpi_fill
-        ws[f"{col}1"].font = Font(bold=True, color="FFFFFF")
-        ws[f"{col}2"].font = Font(bold=True, color="FFFFFF")
-        ws[f"{col}1"].alignment = Alignment(horizontal="center")
-        ws[f"{col}2"].alignment = Alignment(horizontal="center")
-        ws[f"{col}2"].number_format = '#,##0.00 "EGP"'
-        ws.column_dimensions[col].width = 22
+        ws.cell(row=row, column=col).value = title
+        ws.cell(row=row+1, column=col).value = value
 
-    # ==============================
+        ws.cell(row=row, column=col).font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=row+1, column=col).font = Font(bold=True, color="FFFFFF")
+
+        ws.cell(row=row, column=col).fill = kpi_fill
+        ws.cell(row=row+1, column=col).fill = kpi_fill
+
+        ws.cell(row=row+1, column=col).number_format = '#,##0.00 "EGP"'
+
+        col += 2
+
+    # =============================
     # TABLE HEADER
-    # ==============================
+    # =============================
 
     start_row = 5
-
     headers = [
         "Rank",
         "Brand",
@@ -149,9 +128,7 @@ def create_performance_sheet(
         "Sales Money",
         "Inventory Qty",
         "Inventory Value",
-        "After %",
-        "After Rent",
-        "Brand Health"
+        "After All Deductions"
     ]
 
     ws.append([])
@@ -165,17 +142,17 @@ def create_performance_sheet(
         fill_type="solid"
     )
 
-    for col in range(1, len(headers) + 1):
-        cell = ws.cell(row=header_row, column=col)
+    for c in range(1, len(headers) + 1):
+        cell = ws.cell(row=header_row, column=c)
         cell.fill = header_fill
         cell.font = Font(bold=True, color="FFFFFF")
         cell.alignment = Alignment(horizontal="center")
 
-    # ==============================
+    # =============================
     # TABLE DATA
-    # ==============================
+    # =============================
 
-    for _, row in summary_df.iterrows():
+    for _, row in df.iterrows():
         ws.append([
             row["Rank"],
             row["brand"],
@@ -183,28 +160,14 @@ def create_performance_sheet(
             row["total"],
             row["available_quantity"],
             row["inventory_value"],
-            row["after_percentage"],
-            row["after_rent"],
-            row["health"]
+            row["after_all"]
         ])
 
     last_row = ws.max_row
 
-    # Zebra
-    stripe_fill = PatternFill(
-        start_color="E9EEF7",
-        end_color="E9EEF7",
-        fill_type="solid"
-    )
-
-    for r in range(header_row + 1, last_row + 1):
-        if r % 2 == 0:
-            for c in range(1, 10):
-                ws.cell(row=r, column=c).fill = stripe_fill
-
-    # Currency format
-    for col in [4, 6, 7, 8]:
-        for r in range(header_row + 1, last_row + 1):
-            ws.cell(row=r, column=col).number_format = '#,##0.00 "EGP"'
+    for r in range(header_row+1, last_row+1):
+        ws[f"D{r}"].number_format = '#,##0.00 "EGP"'
+        ws[f"F{r}"].number_format = '#,##0.00 "EGP"'
+        ws[f"G{r}"].number_format = '#,##0.00 "EGP"'
 
     auto_fit_columns(ws)
