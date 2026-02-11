@@ -3,6 +3,40 @@ from utils.excel_helpers import auto_fit_columns
 from core.kpi_engine import apply_deal
 
 
+def extract_best_selling_size(brand_sales):
+
+    size_counter = {}
+
+    for _, row in brand_sales.iterrows():
+
+        name = str(row.get("product_name", ""))
+        qty = row.get("quantity", 0)
+
+        if "-" in name:
+            size = name.split("-")[-1].strip()
+            if size:
+                size_counter[size] = size_counter.get(size, 0) + qty
+
+    if not size_counter:
+        return ""
+
+    return max(size_counter, key=size_counter.get)
+
+
+def extract_best_selling_product(brand_sales):
+
+    product_sales = (
+        brand_sales.groupby("product_name")["quantity"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    if product_sales.empty:
+        return ""
+
+    return product_sales.index[0]
+
+
 def create_report_sheet(
     wb,
     brand_name: str,
@@ -28,16 +62,11 @@ def create_report_sheet(
     )
 
     # =========================
-    # FIX KPI COLUMN WIDTHS
+    # FIX KPI COLUMN WIDTH
     # =========================
 
-    ws.column_dimensions["A"].width = 5
-    ws.column_dimensions["B"].width = 22
-    ws.column_dimensions["C"].width = 5
-    ws.column_dimensions["D"].width = 22
-    ws.column_dimensions["E"].width = 5
-    ws.column_dimensions["F"].width = 5
-    ws.column_dimensions["G"].width = 22
+    ws.column_dimensions["B"].width = 25
+    ws.column_dimensions["D"].width = 25
 
     # =========================
     # KPI CARDS (ROW 1)
@@ -79,98 +108,63 @@ def create_report_sheet(
     create_kpi_card(1, "D", "Net After Deal",
                     f"{after_rent:,.2f} EGP")
 
-    create_kpi_card(1, "G", "Inventory Units",
-                    total_inventory_qty)
-
     # =========================
-    # REPORT DETAILS
+    # REPORT BODY (OLD ORDER)
     # =========================
 
     row_pointer = 4
 
-    ws.cell(row=row_pointer, column=1,
-            value="Branch Name:").font = Font(bold=True)
-    ws.cell(row=row_pointer, column=2, value=mode)
+    def write_row(label, value):
 
-    ws.cell(row=row_pointer+1, column=1,
-            value="Brand Name:").font = Font(bold=True)
-    ws.cell(row=row_pointer+1, column=2, value=brand_name)
+        nonlocal row_pointer
 
-    ws.cell(row=row_pointer+2, column=1,
-            value="Payout Cycle:").font = Font(bold=True)
-    ws.cell(row=row_pointer+2, column=2, value=payout_cycle)
+        ws.cell(row=row_pointer, column=1,
+                value=label).font = Font(bold=True)
+        ws.cell(row=row_pointer, column=2,
+                value=value)
 
-    # Skip 2 rows
-    row_pointer += 5
+        row_pointer += 1
 
-    ws.cell(row=row_pointer, column=1,
-            value="Total Inventory Quantity:").font = Font(bold=True)
-    ws.cell(row=row_pointer, column=2, value=total_inventory_qty)
+    best_size = extract_best_selling_size(brand_sales)
+    best_product = extract_best_selling_product(brand_sales)
 
-    ws.cell(row=row_pointer+1, column=1,
-            value="Total Inventory Value:").font = Font(bold=True)
-    ws.cell(row=row_pointer+1, column=2,
-            value=f"{total_inventory_value:,.2f} EGP")
+    brand_deal_text = ""
+    if percentage and rent:
+        brand_deal_text = f"{rent} EGP + {percentage}% Deducted From The Sales"
+    elif percentage:
+        brand_deal_text = f"{percentage}% Deducted From The Sales"
+    elif rent:
+        brand_deal_text = f"{rent} EGP"
+    else:
+        brand_deal_text = "No Deal"
 
-    # Skip 2 rows
-    row_pointer += 4
+    write_row("Branch Name:", mode)
+    write_row("Brand Name:", brand_name)
+    write_row("Brand Deal:", brand_deal_text)
+    write_row("Payout Cycle:", payout_cycle)
 
-    # Best Selling Products (Top 2)
-    product_sales = (
-        brand_sales.groupby("product_name")["quantity"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(2)
-    )
+    write_row("Best Selling Size:", best_size)
+    write_row("Best Selling Product:", best_product)
 
-    best_products_text = ""
-    for product, qty in product_sales.items():
-        best_products_text += f"{product} ({qty})  "
+    write_row("Total Brand Inventory Quantities:",
+              total_inventory_qty)
 
-    ws.cell(row=row_pointer, column=1,
-            value="Best Selling Products:").font = Font(bold=True)
-    ws.cell(row=row_pointer, column=2, value=best_products_text)
+    write_row("Total Brand Inventory Stock Price:",
+              f"{total_inventory_value:,.2f} EGP")
 
-    # Best Selling Size
-    best_size = ""
-    if "size" in brand_sales.columns:
-        size_sales = (
-            brand_sales.groupby("size")["quantity"]
-            .sum()
-            .sort_values(ascending=False)
-        )
-        if not size_sales.empty:
-            best_size = size_sales.index[0]
+    write_row("Total Sales Quantity:",
+              total_sales_qty)
 
-    ws.cell(row=row_pointer+1, column=1,
-            value="Best Selling Size:").font = Font(bold=True)
-    ws.cell(row=row_pointer+1, column=2, value=best_size)
+    write_row("Total Sales (Money):",
+              f"{total_sales_money:,.2f} EGP")
 
-    # Skip 2 rows
-    row_pointer += 4
+    write_row("Total Sales After Percentage:",
+              f"{after_percentage:,.2f} EGP")
 
-    ws.cell(row=row_pointer, column=1,
-            value="Total Sales Quantity:").font = Font(bold=True)
-    ws.cell(row=row_pointer, column=2, value=total_sales_qty)
-
-    ws.cell(row=row_pointer+1, column=1,
-            value="Total Sales Money:").font = Font(bold=True)
-    ws.cell(row=row_pointer+1, column=2,
-            value=f"{total_sales_money:,.2f} EGP")
-
-    ws.cell(row=row_pointer+2, column=1,
-            value="After Percentage:").font = Font(bold=True)
-    ws.cell(row=row_pointer+2, column=2,
-            value=f"{after_percentage:,.2f} EGP")
-
-    ws.cell(row=row_pointer+3, column=1,
-            value="After Rent:").font = Font(bold=True)
-    ws.cell(row=row_pointer+3, column=2,
-            value=f"{after_rent:,.2f} EGP")
+    write_row("Total Sales After Rent:",
+              f"{after_rent:,.2f} EGP")
 
     auto_fit_columns(ws)
 
-    # Re-fix KPI columns after auto-fit
-    ws.column_dimensions["B"].width = 22
-    ws.column_dimensions["D"].width = 22
-    ws.column_dimensions["G"].width = 22
+    ws.column_dimensions["B"].width = 25
+    ws.column_dimensions["D"].width = 25
