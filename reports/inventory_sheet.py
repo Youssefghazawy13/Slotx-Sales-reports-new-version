@@ -1,5 +1,4 @@
-from openpyxl.styles import Font
-from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.styles import Font, PatternFill, Alignment
 from utils.excel_helpers import auto_fit_columns
 
 
@@ -44,9 +43,24 @@ def create_inventory_sheet(wb, brand_inventory, mode):
 
     ws.append(headers)
 
-    # Bold header
+    # =====================================================
+    # HEADER STYLE (Same as Sales)
+    # =====================================================
+
+    header_fill = PatternFill(
+        start_color="0A1F5C",
+        end_color="0A1F5C",
+        fill_type="solid"
+    )
+
     for cell in ws[1]:
-        cell.font = Font(bold=True)
+        cell.fill = header_fill
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.alignment = Alignment(horizontal="center")
+
+    # =====================================================
+    # DATA ROWS
+    # =====================================================
 
     for _, row in brand_inventory.iterrows():
 
@@ -87,29 +101,46 @@ def create_inventory_sheet(wb, brand_inventory, mode):
                 ""
             ])
 
-    # ==============================
-    # TABLE STYLE (NO FILTERS)
-    # ==============================
-
     last_row = ws.max_row
-    last_col = ws.max_column
 
-    table = Table(
-        displayName="InventoryTable",
-        ref=f"A1:{chr(64+last_col)}{last_row}"
+    # =====================================================
+    # ZEBRA STRIPES (Same as Sales)
+    # =====================================================
+
+    stripe_fill = PatternFill(
+        start_color="E9EEF7",
+        end_color="E9EEF7",
+        fill_type="solid"
     )
 
-    style = TableStyleInfo(
-        name="TableStyleMedium9",
-        showFirstColumn=False,
-        showLastColumn=False,
-        showRowStripes=True,
-        showColumnStripes=False
-    )
+    for row in range(2, last_row + 1):
 
-    table.tableStyleInfo = style
-    table.autoFilter = None  # 🔥 Remove filter arrows
+        if row % 2 == 0:
+            for col in range(1, ws.max_column + 1):
+                ws.cell(row=row, column=col).fill = stripe_fill
 
-    ws.add_table(table)
+    # =====================================================
+    # NUMBER FORMATTING
+    # =====================================================
+
+    # Price formatting
+    for row in ws.iter_rows(min_row=2, min_col=3, max_col=3):
+        for cell in row:
+            cell.number_format = '#,##0.00'
+
+    # Quantity formatting
+    if is_merged:
+        qty_cols = [4, 5, 6]
+    else:
+        qty_cols = [4]
+
+    for col in qty_cols:
+        for row in ws.iter_rows(min_row=2, min_col=col, max_col=col):
+            for cell in row:
+                cell.number_format = '#,##0'
+
+    # =====================================================
+    # AUTO FIT
+    # =====================================================
 
     auto_fit_columns(ws)
