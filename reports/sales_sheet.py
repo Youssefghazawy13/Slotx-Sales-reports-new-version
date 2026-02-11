@@ -17,7 +17,7 @@ def create_sales_sheet(wb, brand_sales, mode):
 
     ws.append(headers)
 
-    # HEADER STYLE
+    # HEADER STYLE (same as inventory)
     header_fill = PatternFill(
         start_color="0A1F5C",
         end_color="0A1F5C",
@@ -32,26 +32,28 @@ def create_sales_sheet(wb, brand_sales, mode):
     total_qty = 0
     total_money = 0
 
+    # IMPORTANT: use .get() instead of direct access
     for _, row in brand_sales.iterrows():
 
-        product = row["name_en"]
-        barcode = row["barcodes"]
-        qty = float(row["quantity"])
-        total = float(row["total_price"])
+        product = row.get("Product", "")
+        barcode = row.get("Barcode", "")
+        qty = float(row.get("Quantity", 0) or 0)
+        total = float(row.get("Total Price", 0) or 0)
+        brand = row.get("Brand", "")
 
         total_qty += qty
         total_money += total
 
         ws.append([
             mode,
-            row["brand"],
+            brand,
             product,
             barcode,
             qty,
             total
         ])
 
-    # TOTAL ROW
+    # TOTAL ROW inside table
     ws.append([
         "",
         "",
@@ -63,7 +65,7 @@ def create_sales_sheet(wb, brand_sales, mode):
 
     last_row = ws.max_row
 
-    # Zebra style زي inventory
+    # Zebra style (same as inventory)
     stripe_fill = PatternFill(
         start_color="E9EEF7",
         end_color="E9EEF7",
