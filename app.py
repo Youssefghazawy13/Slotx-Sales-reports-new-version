@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
+import zipfile
 
 from reports.workbook_builder import build_brand_workbook
-from core.zip_builder import build_reports_zip
-from core.deals_loader import load_brand_deals
 
 
 st.set_page_config(
@@ -13,12 +13,86 @@ st.set_page_config(
 
 st.title("Slot-X Sales & Inventory Reports")
 
+
 # ============================================
-# MODE SELECTOR
+# DEALS LOADER (LOCAL - NO CORE IMPORT)
+# ============================================
+
+def load_brand_deals(deals_file, mode: str):
+
+    try:
+        deals_df = pd.read_excel(deals_file, sheet_name=mode)
+
+        deals_df.columns = deals_df.columns.str.strip()
+
+        deals_df["Brand Name"] = (
+            deals_df["Brand Name"]
+            .astype(str)
+            .str.strip()
+        )
+
+        deals_dict = {}
+
+        for _, row in deals_df.iterrows():
+
+            brand = row.get("Brand Name")
+
+            if not brand:
+                continue
+
+            deals_dict[brand] = {
+                "percentage": float(row.get("Deal Percentage (%)", 0) or 0),
+                "rent": float(row.get("Rent Amount (EGP)", 0) or 0)
+            }
+
+        return deals_dict, None
+
+    except Exception as e:
+        return None, str(e)
+
+
+# ============================================
+# ZIP BUILDER
+# ============================================
+
+def build_reports_zip(brand_workbooks):
+
+    zip_buffer = BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+
+        for brand, data in brand_workbooks.items():
+
+            buffer = data["buffer"]
+            has_sales = data["has_sales"]
+
+            if buffer is None:
+                continue
+
+            safe_name = (
+                str(brand)
+                .replace("/", "-")
+                .replace("\\", "-")
+                .replace(":", "-")
+            )
+
+            if has_sales:
+                path = f"Reports/{safe_name}.xlsx"
+            else:
+                path = f"Reports/Empty Brand Guard/{safe_name}.xlsx"
+
+            zip_file.writestr(path, buffer.getvalue())
+
+    zip_buffer.seek(0)
+    return zip_buffer
+
+
+# ============================================
+# UI
 # ============================================
 
 mode = st.selectbox(
-    "Select Report Mode",
+    "Select Mode",
     ["Alexandria", "Zamalek", "Merged"]
 )
 
@@ -28,10 +102,6 @@ payout_cycle = st.selectbox(
 )
 
 st.divider()
-
-# ============================================
-# FILE UPLOADS
-# ============================================
 
 if mode == "Merged":
 
@@ -46,13 +116,13 @@ if mode == "Merged":
         inventory_zam = st.file_uploader("Inventory - Zamalek", type=["xlsx"])
 
 else:
-
     sales_file = st.file_uploader("Sales File", type=["xlsx"])
     inventory_file = st.file_uploader("Inventory File", type=["xlsx"])
 
 deals_file = st.file_uploader("Deals File (Multi-tab)", type=["xlsx"])
 
 st.divider()
+
 
 # ============================================
 # GENERATE
@@ -72,9 +142,7 @@ if st.button("Generate Reports"):
 
     brand_workbooks = {}
 
-    # ============================================
-    # SINGLE MODE
-    # ============================================
+    # ---------------- SINGLE ----------------
 
     if mode != "Merged":
 
@@ -112,14 +180,12 @@ if st.button("Generate Reports"):
                 "has_sales": not brand_sales.empty
             }
 
-    # ============================================
-    # MERGED MODE
-    # ============================================
+    # ---------------- MERGED ----------------
 
     else:
 
         if not all([sales_alex, inventory_alex, sales_zam, inventory_zam]):
-            st.error("Upload all 4 files for merged mode")
+            st.error("Upload all 4 files")
             st.stop()
 
         sales_alex_df = pd.read_excel(sales_alex)
@@ -142,20 +208,10 @@ if st.button("Generate Reports"):
                 sales_zam_df[sales_zam_df["brand"] == brand]
             ])
 
-            alex_inv = inventory_alex_df[inventory_alex_df["brand"] == brand]
-            zam_inv = inventory_zam_df[inventory_zam_df["brand"] == brand]
-
-            if not alex_inv.empty:
-                alex_inv = alex_inv.rename(columns={"quantity": "alex_qty"})
-            if not zam_inv.empty:
-                zam_inv = zam_inv.rename(columns={"quantity": "zamalek_qty"})
-
-            brand_inventory = pd.merge(
-                alex_inv,
-                zam_inv,
-                on=["product_name", "barcode", "price"],
-                how="outer"
-            ).fillna(0)
+            brand_inventory = pd.concat([
+                inventory_alex_df[inventory_alex_df["brand"] == brand],
+                inventory_zam_df[inventory_zam_df["brand"] == brand]
+            ])
 
             workbook_buffer = build_brand_workbook(
                 brand_name=brand,
@@ -173,10 +229,6 @@ if st.button("Generate Reports"):
                 "buffer": workbook_buffer,
                 "has_sales": not brand_sales.empty
             }
-
-    # ============================================
-    # ZIP
-    # ============================================
 
     zip_buffer = build_reports_zip(brand_workbooks)
 
