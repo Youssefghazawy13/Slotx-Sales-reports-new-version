@@ -1,10 +1,8 @@
 from openpyxl import Workbook
-from datetime import datetime
 from reports.branch_summary_performance import create_performance_sheet
 from reports.metadata_sheet import create_metadata_sheet
 from reports.sales_sheet import create_sales_sheet
 from reports.inventory_sheet import create_inventory_sheet
-from utils.excel_helpers import auto_fit_columns
 
 
 def build_branch_summary_workbook(
@@ -17,13 +15,13 @@ def build_branch_summary_workbook(
 
     wb = Workbook()
 
-    # remove default sheet
+    # Remove default sheet
     if "Sheet" in wb.sheetnames:
         wb.remove(wb["Sheet"])
 
-    # ==================================
+    # ============================
     # All Sales Details
-    # ==================================
+    # ============================
 
     create_sales_sheet(
         wb=wb,
@@ -31,9 +29,9 @@ def build_branch_summary_workbook(
         mode=branch_name
     )
 
-    # ==================================
+    # ============================
     # All Inventory
-    # ==================================
+    # ============================
 
     create_inventory_sheet(
         wb=wb,
@@ -41,9 +39,9 @@ def build_branch_summary_workbook(
         mode=branch_name
     )
 
-    # ==================================
+    # ============================
     # Deals Sheet
-    # ==================================
+    # ============================
 
     ws_deals = wb.create_sheet("Deals")
 
@@ -56,11 +54,13 @@ def build_branch_summary_workbook(
             deal.get("rent", 0)
         ])
 
-    auto_fit_columns(ws_deals)
+    ws_deals.column_dimensions["A"].width = 25
+    ws_deals.column_dimensions["B"].width = 15
+    ws_deals.column_dimensions["C"].width = 18
 
-    # ==================================
-    # Branch Summary (Performance)
-    # ==================================
+    # ============================
+    # Branch Summary Sheet
+    # ============================
 
     create_performance_sheet(
         wb=wb,
@@ -71,15 +71,15 @@ def build_branch_summary_workbook(
         deals_dict=deals_dict
     )
 
-    # ==================================
-    # Metadata
-    # ==================================
+    # ============================
+    # Metadata Sheet
+    # ============================
 
     create_metadata_sheet(
-        wb=wb,
-        report_type=f"{branch_name} Summary",
-        branch_name=branch_name,
-        payout_cycle=payout_cycle
+        wb,
+        f"{branch_name} Summary",
+        branch_name,
+        payout_cycle
     )
 
     return wb
