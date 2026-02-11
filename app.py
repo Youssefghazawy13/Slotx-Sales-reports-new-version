@@ -16,8 +16,9 @@ st.set_page_config(
 
 st.title("Slot-X Sales & Inventory Reports")
 
+
 # =========================================================
-# 🔁 REFUND REMOVAL (OLD APP LOGIC RESTORED)
+# REFUND REMOVAL (OLD LOGIC EXACTLY)
 # =========================================================
 
 def remove_refunds_and_original_sales(sales_df):
@@ -48,26 +49,19 @@ def remove_refunds_and_original_sales(sales_df):
         if not matching_sales.empty:
             indices_to_remove.add(matching_sales.index[0])
 
-    cleaned_df = sales_df.drop(index=indices_to_remove)
-
-    return cleaned_df
+    return sales_df.drop(index=indices_to_remove)
 
 
 # =========================================================
 # MODE
 # =========================================================
 
-mode = st.selectbox(
-    "Select Mode",
-    ["Zamalek", "Alexandria", "Merged"]
-)
+mode = st.selectbox("Select Mode", ["Zamalek", "Alexandria", "Merged"])
 
-payout_cycle = st.selectbox(
-    "Select Payout Cycle",
-    ["Cycle 1", "Cycle 2"]
-)
+payout_cycle = st.selectbox("Select Payout Cycle", ["Cycle 1", "Cycle 2"])
 
 st.divider()
+
 
 # =========================================================
 # FILE UPLOAD
@@ -106,15 +100,17 @@ if st.button("Generate Reports"):
 
         if mode == "Merged":
 
-            sales_zam = pd.read_excel(sales_zam_file)
+            sales_zam = remove_refunds_and_original_sales(
+                pd.read_excel(sales_zam_file)
+            )
+
             inv_zam = pd.read_excel(inventory_zam_file)
 
-            sales_alex = pd.read_excel(sales_alex_file)
-            inv_alex = pd.read_excel(inventory_alex_file)
+            sales_alex = remove_refunds_and_original_sales(
+                pd.read_excel(sales_alex_file)
+            )
 
-            # 🔥 restore refund removal
-            sales_zam = remove_refunds_and_original_sales(sales_zam)
-            sales_alex = remove_refunds_and_original_sales(sales_alex)
+            inv_alex = pd.read_excel(inventory_alex_file)
 
             deals_merged = load_deals_by_mode(deals_file, "Merged")
             deals_zam = load_deals_by_mode(deals_file, "Zamalek")
@@ -130,12 +126,14 @@ if st.button("Generate Reports"):
                 zam_inv_brand = inv_zam[inv_zam["brand"] == brand]
                 alex_inv_brand = inv_alex[inv_alex["brand"] == brand]
 
+                # 🔥 نحسب الكميات لكل فرع فقط
                 zam_qty = zam_inv_brand["available_quantity"].sum()
                 alex_qty = alex_inv_brand["available_quantity"].sum()
 
                 if zam_qty == 0 and alex_qty == 0:
                     continue
 
+                # تحديد نوع البراند حسب inventory فقط
                 if alex_qty > 0 and zam_qty > 0:
                     branch_type = "Merged"
                     deals_dict = deals_merged
@@ -143,10 +141,12 @@ if st.button("Generate Reports"):
                         [alex_inv_brand, zam_inv_brand],
                         ignore_index=True
                     )
+
                 elif zam_qty > 0:
                     branch_type = "Zamalek"
                     deals_dict = deals_zam
                     brand_inventory = zam_inv_brand.copy()
+
                 else:
                     branch_type = "Alexandria"
                     deals_dict = deals_alex
@@ -162,6 +162,7 @@ if st.button("Generate Reports"):
 
                 deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
 
+                # 🔥 Empty Guard Logic صحيح
                 if total_sales_qty == 0 and total_inventory_qty > 0:
                     subfolder = "Empty Brand Guard"
                 elif deal["percentage"] == 0 and deal["rent"] == 0:
@@ -193,11 +194,11 @@ if st.button("Generate Reports"):
 
         else:
 
-            sales_df = pd.read_excel(sales_file)
-            inventory_df = pd.read_excel(inventory_file)
+            sales_df = remove_refunds_and_original_sales(
+                pd.read_excel(sales_file)
+            )
 
-            # 🔥 restore refund removal
-            sales_df = remove_refunds_and_original_sales(sales_df)
+            inventory_df = pd.read_excel(inventory_file)
 
             deals_dict = load_deals_by_mode(deals_file, mode)
 
@@ -246,7 +247,7 @@ if st.button("Generate Reports"):
 
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
-            # Summary only for single branch
+            # Summary only in single branch
             summary_wb = build_branch_summary_workbook(
                 branch_name=mode,
                 payout_cycle=payout_cycle,
