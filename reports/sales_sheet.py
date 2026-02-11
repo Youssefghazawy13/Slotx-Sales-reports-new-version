@@ -17,10 +17,7 @@ def create_sales_sheet(wb, brand_sales, mode):
 
     ws.append(headers)
 
-    # =========================
-    # HEADER STYLE (SAME AS INVENTORY)
-    # =========================
-
+    # HEADER STYLE
     header_fill = PatternFill(
         start_color="0A1F5C",
         end_color="0A1F5C",
@@ -32,74 +29,60 @@ def create_sales_sheet(wb, brand_sales, mode):
         cell.font = Font(bold=True, color="FFFFFF")
         cell.alignment = Alignment(horizontal="center")
 
-    # =========================
-    # DATA ROWS
-    # =========================
-
     total_qty = 0
     total_money = 0
 
     for _, row in brand_sales.iterrows():
 
-        qty = float(row.get("quantity", 0) or 0)
-        total = float(row.get("total", 0) or 0)
+        product = row["name_en"]
+        barcode = row["barcodes"]
+        qty = float(row["quantity"])
+        total = float(row["total_price"])
 
         total_qty += qty
         total_money += total
 
         ws.append([
             mode,
-            row.get("brand", ""),
-            row.get("product_name", ""),
-            row.get("barcode", ""),
+            row["brand"],
+            product,
+            barcode,
             qty,
             total
         ])
 
-    # =========================
-    # TOTAL ROW (INSIDE TABLE)
-    # =========================
-
+    # TOTAL ROW
     ws.append([
         "",
         "",
         "",
         "",
         f"Total={int(total_qty)}",
-        total_money
+        f"Total={total_money:,.2f} EGP"
     ])
 
     last_row = ws.max_row
 
-    # =========================
-    # ZEBRA STYLE (SAME AS INVENTORY)
-    # =========================
-
+    # Zebra style زي inventory
     stripe_fill = PatternFill(
         start_color="E9EEF7",
         end_color="E9EEF7",
         fill_type="solid"
     )
 
-    for row in range(2, last_row + 1):
-        if row % 2 == 0:
-            for col in range(1, ws.max_column + 1):
-                ws.cell(row=row, column=col).fill = stripe_fill
+    for r in range(2, last_row + 1):
+        if r % 2 == 0:
+            for c in range(1, ws.max_column + 1):
+                ws.cell(row=r, column=c).fill = stripe_fill
 
-    # =========================
-    # NUMBER FORMATTING
-    # =========================
-
-    # Quantity column
-    for row in ws.iter_rows(min_row=2, min_col=5, max_col=5):
+    # Quantity format
+    for row in ws.iter_rows(min_row=2, max_row=last_row-1, min_col=5, max_col=5):
         for cell in row:
-            if isinstance(cell.value, (int, float)):
-                cell.number_format = '#,##0'
+            cell.number_format = '#,##0'
 
-    # Total Price column
-    for row in ws.iter_rows(min_row=2, min_col=6, max_col=6):
+    # Price format
+    for row in ws.iter_rows(min_row=2, max_row=last_row-1, min_col=6, max_col=6):
         for cell in row:
-            if isinstance(cell.value, (int, float)):
-                cell.number_format = '#,##0.00 "EGP"'
+            cell.number_format = '#,##0.00 "EGP"'
 
     auto_fit_columns(ws)
