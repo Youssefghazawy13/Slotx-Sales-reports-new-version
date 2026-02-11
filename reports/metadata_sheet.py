@@ -18,7 +18,7 @@ def create_metadata_sheet(wb, report_title, branch_name, payout_cycle):
     )
 
     for row in range(1, 6):
-        for col in range(1, 7):
+        for col in range(1, 5):
             ws.cell(row=row, column=col).fill = dark_blue
 
     # =========================================
@@ -32,7 +32,7 @@ def create_metadata_sheet(wb, report_title, branch_name, payout_cycle):
 
     title_cell.font = Font(
         name="Arial Black",   # أقرب شكل للفونت اللي كان ظاهر
-        size=48,
+        size=40,
         bold=True,
         color="FFFFFF"
     )
