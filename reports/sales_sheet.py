@@ -1,7 +1,7 @@
 # reports/sales_sheet.py
 
 from openpyxl.styles import Font
-from utils.excel_helpers import auto_fit_columns
+from utils.excel_helpers import auto_fit_columns, apply_header_style, format_money_cell
 
 
 def create_sales_sheet(
@@ -10,13 +10,6 @@ def create_sales_sheet(
     mode: str,
     brand_sales
 ):
-    """
-    Create Sales sheet.
-
-    Returns:
-        total_sales_qty,
-        total_sales_money
-    """
 
     ws = wb.create_sheet("Sales")
 
@@ -30,10 +23,7 @@ def create_sales_sheet(
     ]
 
     ws.append(headers)
-
-    # Bold header
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
+    apply_header_style(ws)
 
     total_qty = 0
     total_money = 0
@@ -43,7 +33,7 @@ def create_sales_sheet(
         total = row.get("total", 0)
 
         ws.append([
-            mode,                  # Branch Name (Merged or single)
+            mode,
             brand_name,
             row.get("product_name", ""),
             row.get("barcode", ""),
@@ -51,20 +41,15 @@ def create_sales_sheet(
             total
         ])
 
+        ws.cell(row=ws.max_row, column=6).number_format = '#,##0.00'
+
         total_qty += qty
         total_money += total
 
-    # Add one TOTAL row only
-    ws.append([
-        "",
-        "",
-        "",
-        "TOTAL",
-        total_qty,
-        total_money
-    ])
+    ws.append(["", "", "", "TOTAL", total_qty, total_money])
 
-    # Bold total row
+    ws.cell(row=ws.max_row, column=6).number_format = '#,##0.00'
+
     for cell in ws[ws.max_row]:
         cell.font = Font(bold=True)
 
