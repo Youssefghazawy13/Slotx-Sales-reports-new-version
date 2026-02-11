@@ -102,26 +102,20 @@ if st.button("Generate Reports"):
             sales_zam = remove_refunds_and_original_sales(
                 pd.read_excel(sales_zam_file)
             )
-
             inv_zam = pd.read_excel(inventory_zam_file)
 
             sales_alex = remove_refunds_and_original_sales(
                 pd.read_excel(sales_alex_file)
             )
-
             inv_alex = pd.read_excel(inventory_alex_file)
-
-            # 🔥🔥🔥 الإصلاح الحقيقي هنا 🔥🔥🔥
 
             # تنظيف الأعمدة
             inv_zam.columns = inv_zam.columns.str.strip()
             inv_alex.columns = inv_alex.columns.str.strip()
 
-            # توحيد اسم البراند
             inv_zam["brand"] = inv_zam["brand"].astype(str).str.strip().str.title()
             inv_alex["brand"] = inv_alex["brand"].astype(str).str.strip().str.title()
 
-            # تحويل الكمية لأرقام حقيقية
             inv_zam["available_quantity"] = pd.to_numeric(
                 inv_zam["available_quantity"], errors="coerce"
             ).fillna(0)
@@ -150,23 +144,61 @@ if st.button("Generate Reports"):
                 if zam_qty == 0 and alex_qty == 0:
                     continue
 
+                # =====================================================
+                # 🔥 FIXED MERGE LOGIC 🔥
+                # =====================================================
+
                 if alex_qty > 0 and zam_qty > 0:
+
                     branch_type = "Merged"
                     deals_dict = deals_merged
-                    brand_inventory = pd.concat(
-                        [alex_inv_brand, zam_inv_brand],
-                        ignore_index=True
+
+                    merged_inventory = pd.merge(
+                        alex_inv_brand,
+                        zam_inv_brand,
+                        on=["brand", "name_en", "barcodes", "sale_price"],
+                        how="outer",
+                        suffixes=("_alex", "_zam")
                     )
 
+                    merged_inventory["alex_qty"] = merged_inventory.get(
+                        "available_quantity_alex", 0
+                    ).fillna(0)
+
+                    merged_inventory["zamalek_qty"] = merged_inventory.get(
+                        "available_quantity_zam", 0
+                    ).fillna(0)
+
+                    merged_inventory["available_quantity"] = (
+                        merged_inventory["alex_qty"] +
+                        merged_inventory["zamalek_qty"]
+                    )
+
+                    brand_inventory = merged_inventory[
+                        [
+                            "brand",
+                            "name_en",
+                            "barcodes",
+                            "sale_price",
+                            "alex_qty",
+                            "zamalek_qty",
+                            "available_quantity"
+                        ]
+                    ]
+
                 elif zam_qty > 0:
+
                     branch_type = "Zamalek"
                     deals_dict = deals_zam
                     brand_inventory = zam_inv_brand.copy()
 
                 else:
+
                     branch_type = "Alexandria"
                     deals_dict = deals_alex
                     brand_inventory = alex_inv_brand.copy()
+
+                # =====================================================
 
                 brand_sales = pd.concat([
                     sales_zam[sales_zam["brand"] == brand],
@@ -204,7 +236,7 @@ if st.button("Generate Reports"):
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
         # =====================================================
-        # SINGLE MODE (بدون تغيير)
+        # SINGLE MODE (UNCHANGED)
         # =====================================================
 
         else:
