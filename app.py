@@ -1,27 +1,21 @@
 import streamlit as st
 import pandas as pd
-import zipfile
-from io import BytesIO
 
-from utils.column_detector import detect_columns
-from core.refund_engine import clean_refunds
-from core.deals_engine import load_deals_by_mode
-from core.brand_detector import detect_brands
-from core.classification_engine import classify_brand
-from core.kpi_engine import calculate_sales_totals, calculate_inventory_totals
 from reports.workbook_builder import build_brand_workbook
+from core.zip_builder import build_reports_zip
+from core.deals_loader import load_brand_deals
 
 
 st.set_page_config(
     page_title="Slot-X Sales & Inventory Reports",
-    layout="wide"
+    layout="centered"
 )
 
-st.title("📊 Slot-X Sales & Inventory Reports")
+st.title("Slot-X Sales & Inventory Reports")
 
-# -----------------------
-# MODE SELECTION
-# -----------------------
+# ============================================
+# MODE SELECTOR
+# ============================================
 
 mode = st.selectbox(
     "Select Report Mode",
@@ -35,223 +29,162 @@ payout_cycle = st.selectbox(
 
 st.divider()
 
-# -----------------------
+# ============================================
 # FILE UPLOADS
-# -----------------------
+# ============================================
 
 if mode == "Merged":
-    st.subheader("Zamalek Files")
-    sales_zam_file = st.file_uploader("Zamalek Sales", type=["xlsx"])
-    inventory_zam_file = st.file_uploader("Zamalek Inventory", type=["xlsx"])
 
-    st.subheader("Alexandria Files")
-    sales_alex_file = st.file_uploader("Alexandria Sales", type=["xlsx"])
-    inventory_alex_file = st.file_uploader("Alexandria Inventory", type=["xlsx"])
+    col1, col2 = st.columns(2)
+
+    with col1:
+        sales_alex = st.file_uploader("Sales - Alexandria", type=["xlsx"])
+        inventory_alex = st.file_uploader("Inventory - Alexandria", type=["xlsx"])
+
+    with col2:
+        sales_zam = st.file_uploader("Sales - Zamalek", type=["xlsx"])
+        inventory_zam = st.file_uploader("Inventory - Zamalek", type=["xlsx"])
 
 else:
+
     sales_file = st.file_uploader("Sales File", type=["xlsx"])
     inventory_file = st.file_uploader("Inventory File", type=["xlsx"])
 
-st.subheader("Deals File (3 Tabs Required)")
-deals_file = st.file_uploader("Deals File", type=["xlsx"])
+deals_file = st.file_uploader("Deals File (Multi-tab)", type=["xlsx"])
 
 st.divider()
 
-# -----------------------
-# GENERATE BUTTON
-# -----------------------
+# ============================================
+# GENERATE
+# ============================================
 
-if st.button("🚀 Generate Reports", use_container_width=True):
+if st.button("Generate Reports"):
 
     if not deals_file:
-        st.error("Deals file is required.")
+        st.error("Upload deals file")
         st.stop()
 
-    zip_buffer = BytesIO()
+    deals_dict, error = load_brand_deals(deals_file, mode)
 
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+    if error:
+        st.error(error)
+        st.stop()
 
-        # -----------------------
-        # SINGLE MODE
-        # -----------------------
+    brand_workbooks = {}
 
-        if mode in ["Alexandria", "Zamalek"]:
+    # ============================================
+    # SINGLE MODE
+    # ============================================
 
-            if not sales_file or not inventory_file:
-                st.error("Sales and Inventory files are required.")
-                st.stop()
+    if mode != "Merged":
 
-            sales_df = detect_columns(
-                pd.read_excel(sales_file),
-                "sales"
+        if not sales_file or not inventory_file:
+            st.error("Upload sales & inventory")
+            st.stop()
+
+        sales_df = pd.read_excel(sales_file)
+        inventory_df = pd.read_excel(inventory_file)
+
+        brands = pd.concat([
+            sales_df["brand"],
+            inventory_df["brand"]
+        ]).dropna().unique()
+
+        for brand in brands:
+
+            brand_sales = sales_df[sales_df["brand"] == brand]
+            brand_inventory = inventory_df[inventory_df["brand"] == brand]
+
+            workbook_buffer = build_brand_workbook(
+                brand_name=brand,
+                mode=mode,
+                payout_cycle=payout_cycle,
+                brand_sales=brand_sales,
+                brand_inventory=brand_inventory,
+                deals_dict=deals_dict
             )
 
-            inventory_df = detect_columns(
-                pd.read_excel(inventory_file),
-                "inventory"
+            if workbook_buffer is None:
+                continue
+
+            brand_workbooks[brand] = {
+                "buffer": workbook_buffer,
+                "has_sales": not brand_sales.empty
+            }
+
+    # ============================================
+    # MERGED MODE
+    # ============================================
+
+    else:
+
+        if not all([sales_alex, inventory_alex, sales_zam, inventory_zam]):
+            st.error("Upload all 4 files for merged mode")
+            st.stop()
+
+        sales_alex_df = pd.read_excel(sales_alex)
+        sales_zam_df = pd.read_excel(sales_zam)
+
+        inventory_alex_df = pd.read_excel(inventory_alex)
+        inventory_zam_df = pd.read_excel(inventory_zam)
+
+        brands = pd.concat([
+            sales_alex_df["brand"],
+            sales_zam_df["brand"],
+            inventory_alex_df["brand"],
+            inventory_zam_df["brand"]
+        ]).dropna().unique()
+
+        for brand in brands:
+
+            brand_sales = pd.concat([
+                sales_alex_df[sales_alex_df["brand"] == brand],
+                sales_zam_df[sales_zam_df["brand"] == brand]
+            ])
+
+            alex_inv = inventory_alex_df[inventory_alex_df["brand"] == brand]
+            zam_inv = inventory_zam_df[inventory_zam_df["brand"] == brand]
+
+            if not alex_inv.empty:
+                alex_inv = alex_inv.rename(columns={"quantity": "alex_qty"})
+            if not zam_inv.empty:
+                zam_inv = zam_inv.rename(columns={"quantity": "zamalek_qty"})
+
+            brand_inventory = pd.merge(
+                alex_inv,
+                zam_inv,
+                on=["product_name", "barcode", "price"],
+                how="outer"
+            ).fillna(0)
+
+            workbook_buffer = build_brand_workbook(
+                brand_name=brand,
+                mode=mode,
+                payout_cycle=payout_cycle,
+                brand_sales=brand_sales,
+                brand_inventory=brand_inventory,
+                deals_dict=deals_dict
             )
 
-            sales_df, _, _ = clean_refunds(sales_df)
+            if workbook_buffer is None:
+                continue
 
-            deals_dict = load_deals_by_mode(deals_file, mode)
+            brand_workbooks[brand] = {
+                "buffer": workbook_buffer,
+                "has_sales": not brand_sales.empty
+            }
 
-            brands = detect_brands(sales_df, inventory_df)
+    # ============================================
+    # ZIP
+    # ============================================
 
-            for brand in brands:
+    zip_buffer = build_reports_zip(brand_workbooks)
 
-                brand_sales = sales_df[sales_df["brand"] == brand]
-                brand_inventory = inventory_df[inventory_df["brand"] == brand]
-
-                total_sales_qty, _ = calculate_sales_totals(brand_sales)
-                total_inventory_qty, _ = calculate_inventory_totals(brand_inventory)
-
-                has_brand_deal = brand in deals_dict
-
-                classification = classify_brand(
-                    total_sales_qty,
-                    total_inventory_qty,
-                    has_brand_deal
-                )
-
-                if not classification:
-                    continue
-
-                workbook_buffer = build_brand_workbook(
-                    brand,
-                    mode,
-                    payout_cycle,
-                    brand_sales,
-                    brand_inventory=brand_inventory,
-                    deals_dict=deals_dict
-                )
-
-                folder_path = f"{mode}/{classification}/{brand}.xlsx"
-
-                zip_file.writestr(folder_path, workbook_buffer.getvalue())
-
-        # -----------------------
-        # MERGED MODE
-        # -----------------------
-
-        else:
-
-            if not all([
-                sales_zam_file,
-                inventory_zam_file,
-                sales_alex_file,
-                inventory_alex_file
-            ]):
-                st.error("All branch files are required.")
-                st.stop()
-
-            # Load & detect columns
-            sales_zam = detect_columns(pd.read_excel(sales_zam_file), "sales")
-            inventory_zam = detect_columns(pd.read_excel(inventory_zam_file), "inventory")
-
-            sales_alex = detect_columns(pd.read_excel(sales_alex_file), "sales")
-            inventory_alex = detect_columns(pd.read_excel(inventory_alex_file), "inventory")
-
-            # Clean refunds per branch
-            sales_zam, _, _ = clean_refunds(sales_zam)
-            sales_alex, _, _ = clean_refunds(sales_alex)
-
-            # Load deals tabs
-            deals_zam = load_deals_by_mode(deals_file, "Zamalek")
-            deals_alex = load_deals_by_mode(deals_file, "Alexandria")
-            deals_merged = load_deals_by_mode(deals_file, "Merged")
-
-            # Process each branch separately
-            for branch_name, sales_df, inventory_df, deals_dict in [
-                ("Zamalek", sales_zam, inventory_zam, deals_zam),
-                ("Alexandria", sales_alex, inventory_alex, deals_alex)
-            ]:
-
-                brands = detect_brands(sales_df, inventory_df)
-
-                for brand in brands:
-
-                    brand_sales = sales_df[sales_df["brand"] == brand]
-                    brand_inventory = inventory_df[inventory_df["brand"] == brand]
-
-                    total_sales_qty, _ = calculate_sales_totals(brand_sales)
-                    total_inventory_qty, _ = calculate_inventory_totals(brand_inventory)
-
-                    has_brand_deal = brand in deals_dict
-
-                    classification = classify_brand(
-                        total_sales_qty,
-                        total_inventory_qty,
-                        has_brand_deal
-                    )
-
-                    if not classification:
-                        continue
-
-                    workbook_buffer = build_brand_workbook(
-                        brand,
-                        branch_name,
-                        payout_cycle,
-                        brand_sales,
-                        brand_inventory=brand_inventory,
-                        deals_dict=deals_dict
-                    )
-
-                    folder_path = f"{branch_name}/{classification}/{brand}.xlsx"
-                    zip_file.writestr(folder_path, workbook_buffer.getvalue())
-
-            # --- MERGED PROCESSING ---
-
-            merged_sales = pd.concat([sales_zam, sales_alex])
-            merged_inventory = pd.concat([inventory_zam, inventory_alex])
-
-            brands_merged = detect_brands(merged_sales, merged_inventory)
-
-            for brand in brands_merged:
-
-                brand_sales = merged_sales[merged_sales["brand"] == brand]
-
-                inv_alex = inventory_alex[inventory_alex["brand"] == brand]
-                inv_zam = inventory_zam[inventory_zam["brand"] == brand]
-
-                total_sales_qty, _ = calculate_sales_totals(brand_sales)
-
-                total_inventory_qty = (
-                    inv_alex["available_quantity"].sum()
-                    + inv_zam["available_quantity"].sum()
-                )
-
-                has_brand_deal = brand in deals_merged
-
-                classification = classify_brand(
-                    total_sales_qty,
-                    total_inventory_qty,
-                    has_brand_deal
-                )
-
-                if not classification:
-                    continue
-
-                workbook_buffer = build_brand_workbook(
-                    brand,
-                    "Merged",
-                    payout_cycle,
-                    brand_sales,
-                    inventory_alex=inv_alex,
-                    inventory_zam=inv_zam,
-                    deals_dict=deals_merged
-                )
-
-                folder_path = f"Merged/{classification}/{brand}.xlsx"
-                zip_file.writestr(folder_path, workbook_buffer.getvalue())
-
-    zip_buffer.seek(0)
-
-    st.success("Reports generated successfully.")
+    st.success("Reports generated successfully!")
 
     st.download_button(
-        "📥 Download ZIP",
+        label="Download ZIP",
         data=zip_buffer,
-        file_name=f"SlotX_Reports_{mode}.zip",
-        mime="application/zip",
-        use_container_width=True
+        file_name=f"SlotX_Reports_{mode}_{payout_cycle}.zip",
+        mime="application/zip"
     )
