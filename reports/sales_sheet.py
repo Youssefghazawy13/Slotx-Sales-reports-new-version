@@ -17,9 +17,9 @@ def create_sales_sheet(wb, brand_sales, mode):
 
     ws.append(headers)
 
-    # ==============================
+    # =========================
     # HEADER STYLE
-    # ==============================
+    # =========================
 
     header_fill = PatternFill(
         start_color="0A1F5C",
@@ -33,55 +33,54 @@ def create_sales_sheet(wb, brand_sales, mode):
         cell.alignment = Alignment(horizontal="center")
 
     total_qty = 0
-    total_money = 0
+    total_price = 0
 
-    # ==============================
+    # =========================
     # DATA ROWS
-    # ==============================
+    # =========================
 
     for _, row in brand_sales.iterrows():
 
-        branch_name = mode
-
+        branch = mode
         brand = row.get("brand", "")
         product = row.get("name_ar", "")
         barcode = row.get("barcode", "")
-        qty = row.get("quantity", 0)
-        total = row.get("total", 0)
+        qty = float(row.get("quantity", 0) or 0)
+        price = float(row.get("total", 0) or 0)
 
         total_qty += qty
-        total_money += total
+        total_price += price
 
         ws.append([
-            branch_name,
+            branch,
             brand,
             product,
             barcode,
             qty,
-            total
+            f"{price:,.2f} EGP"
         ])
 
-    # ==============================
-    # TOTAL ROW
-    # ==============================
+    last_row = ws.max_row + 1
+
+    # =========================
+    # TOTAL ROW (NO WORD TOTAL)
+    # =========================
 
     ws.append([
         "",
         "",
         "",
-        "TOTAL",
-        total_qty,
-        total_money
+        "",
+        f"Total={int(total_qty)}",
+        f"Total={total_price:,.2f} EGP"
     ])
 
-    total_row = ws.max_row
+    for cell in ws[ws.max_row]:
+        cell.font = Font(bold=True)
 
-    for col in range(1, ws.max_column + 1):
-        ws.cell(row=total_row, column=col).font = Font(bold=True)
-
-    # ==============================
-    # ZEBRA STRIPES
-    # ==============================
+    # =========================
+    # ZEBRA STYLE
+    # =========================
 
     stripe_fill = PatternFill(
         start_color="E9EEF7",
@@ -89,22 +88,9 @@ def create_sales_sheet(wb, brand_sales, mode):
         fill_type="solid"
     )
 
-    for row in range(2, total_row):
-
+    for row in range(2, ws.max_row):
         if row % 2 == 0:
             for col in range(1, ws.max_column + 1):
                 ws.cell(row=row, column=col).fill = stripe_fill
-
-    # ==============================
-    # NUMBER FORMAT
-    # ==============================
-
-    for row in ws.iter_rows(min_row=2, min_col=6, max_col=6):
-        for cell in row:
-            cell.number_format = '#,##0.00'
-
-    # ==============================
-    # AUTO FIT
-    # ==============================
 
     auto_fit_columns(ws)
