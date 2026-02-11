@@ -18,11 +18,10 @@ def create_metadata_sheet(
     dark_blue_font = Font(color="1F4E78")
     bold_dark_blue_font = Font(bold=True, color="1F4E78")
 
-    # -------------------------
-    # Add Logo (Top-Left)
-    # -------------------------
-
-    logo_path = "assets/logo.png"
+    # 🔥 Get absolute path safely
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    logo_path = os.path.join(project_root, "assets", "logo.png")
 
     if os.path.exists(logo_path):
         try:
@@ -33,7 +32,6 @@ def create_metadata_sheet(
         except Exception:
             pass
 
-    # Space under logo
     ws.append([""])
     ws.append([""])
     ws.append([""])
@@ -51,14 +49,10 @@ def create_metadata_sheet(
     for row in metadata_rows:
         ws.append(row)
 
-    # Apply styling
     start_row = ws.max_row - len(metadata_rows) + 1
 
     for row in ws.iter_rows(min_row=start_row, max_row=ws.max_row):
-        label_cell = row[0]
-        value_cell = row[1]
-
-        label_cell.font = bold_dark_blue_font
-        value_cell.font = dark_blue_font
+        row[0].font = bold_dark_blue_font
+        row[1].font = dark_blue_font
 
     auto_fit_columns(ws)
