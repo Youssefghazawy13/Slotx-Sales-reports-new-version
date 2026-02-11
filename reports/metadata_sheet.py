@@ -1,10 +1,8 @@
 # reports/metadata_sheet.py
 
-from openpyxl.styles import Font
-from openpyxl.drawing.image import Image
+from openpyxl.styles import Font, Alignment
 from datetime import datetime
 from utils.excel_helpers import auto_fit_columns
-import os
 
 
 def create_metadata_sheet(
@@ -15,35 +13,41 @@ def create_metadata_sheet(
 
     ws = wb.create_sheet("Metadata")
 
+    # -------------------------
+    # SLOT-X TEXT BANNER
+    # -------------------------
+
+    # Merge wide area for title
+    ws.merge_cells("A1:H4")
+
+    title_cell = ws["A1"]
+    title_cell.value = "SLOT-X"
+
+    # Metallic-like text styling
+    title_cell.font = Font(
+        name="Impact",       # لو مش متاح هي fallback
+        size=42,
+        bold=True,
+        color="BFBFBF"       # Metallic gray
+    )
+
+    title_cell.alignment = Alignment(
+        horizontal="center",
+        vertical="center"
+    )
+
+    # Increase height for visual weight
+    for i in range(1, 5):
+        ws.row_dimensions[i].height = 40
+
+    # -------------------------
+    # Metadata Section
+    # -------------------------
+
     dark_blue_font = Font(color="1F4E78")
     bold_dark_blue_font = Font(bold=True, color="1F4E78")
 
-    # -------------------------
-    # Create header space for logo
-    # -------------------------
-
-    ws.merge_cells("A1:D6")
-
-    # Increase row height
-    for i in range(1, 7):
-        ws.row_dimensions[i].height = 25
-
-    logo_path = os.path.join("assets", "logo.png")
-
-    if os.path.exists(logo_path):
-        try:
-            img = Image(logo_path)
-            img.width = 220
-            img.height = 110
-            ws.add_image(img, "A1")
-        except Exception as e:
-            print("Logo load error:", e)
-
-    # -------------------------
-    # Metadata content below logo
-    # -------------------------
-
-    start_row = 8
+    start_row = 6
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
