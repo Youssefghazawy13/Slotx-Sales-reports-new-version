@@ -22,49 +22,55 @@ def build_brand_workbook(
     if "Sheet" in wb.sheetnames:
         wb.remove(wb["Sheet"])
 
-    # =========================
+    # ============================
     # SALES SHEET
-    # =========================
+    # ============================
+
     create_sales_sheet(
         wb=wb,
         brand_sales=brand_sales,
         mode=mode
     )
 
-    # =========================
+    # ============================
     # INVENTORY SHEET
-    # =========================
+    # ============================
+
     create_inventory_sheet(
         wb=wb,
         brand_inventory=brand_inventory,
         mode=mode
     )
 
-    # =========================
+    # ============================
     # REPORT SHEET
-    # =========================
+    # ============================
+
     create_report_sheet(
-        wb,
-        brand_name,
-        mode,
-        payout_cycle,
-        brand_sales,
-        brand_inventory,
-        deals_dict
-    )
-
-    # =========================
-    # METADATA SHEET
-    # =========================
-    create_metadata_sheet(
         wb=wb,
+        brand_name=brand_name,
         mode=mode,
-        payout_cycle=payout_cycle
+        payout_cycle=payout_cycle,
+        brand_sales=brand_sales,
+        brand_inventory=brand_inventory,
+        deals_dict=deals_dict
     )
 
-    # =========================
-    # SAVE TO BUFFER
-    # =========================
+    # ============================
+    # METADATA SHEET
+    # ============================
+
+    create_metadata_sheet(
+        wb,
+        f"{brand_name} Report",
+        mode,
+        payout_cycle
+    )
+
+    # ============================
+    # RETURN BUFFER
+    # ============================
+
     buffer = BytesIO()
     wb.save(buffer)
     buffer.seek(0)
