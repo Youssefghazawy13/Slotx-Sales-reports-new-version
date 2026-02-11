@@ -32,14 +32,14 @@ def create_sales_sheet(wb, brand_sales, mode):
     total_qty = 0
     total_money = 0
 
-    # IMPORTANT: use .get() instead of direct access
     for _, row in brand_sales.iterrows():
 
-        product = row.get("Product", "")
-        barcode = row.get("Barcode", "")
-        qty = float(row.get("Quantity", 0) or 0)
-        total = float(row.get("Total Price", 0) or 0)
-        brand = row.get("Brand", "")
+        # 👇 نفس الأعمدة القديمة بدون تغيير
+        product = row.get("name_ar") or row.get("name_en") or ""
+        barcode = row.get("barcode", "")
+        qty = float(row.get("quantity", 0) or 0)
+        total = float(row.get("total", 0) or 0)
+        brand = row.get("brand", "")
 
         total_qty += qty
         total_money += total
@@ -53,7 +53,7 @@ def create_sales_sheet(wb, brand_sales, mode):
             total
         ])
 
-    # TOTAL ROW inside table
+    # TOTAL ROW (inside table)
     ws.append([
         "",
         "",
