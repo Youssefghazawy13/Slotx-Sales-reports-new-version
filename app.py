@@ -16,9 +16,9 @@ st.set_page_config(
 
 st.title("Slot-X Sales & Inventory Reports")
 
-# ==============================
-# MODE
-# ==============================
+# =========================================
+# MODE SELECTION
+# =========================================
 
 mode = st.selectbox(
     "Select Mode",
@@ -32,9 +32,9 @@ payout_cycle = st.selectbox(
 
 st.divider()
 
-# ==============================
+# =========================================
 # FILE UPLOADS
-# ==============================
+# =========================================
 
 if mode == "Merged":
 
@@ -52,9 +52,9 @@ else:
     inventory_file = st.file_uploader("Upload Inventory File")
     deals_file = st.file_uploader("Upload Deals File")
 
-# ==============================
-# GENERATE
-# ==============================
+# =========================================
+# GENERATE BUTTON
+# =========================================
 
 if st.button("Generate Reports"):
 
@@ -78,7 +78,7 @@ if st.button("Generate Reports"):
             deals_zam = load_deals_by_mode(deals_file, "Zamalek")
             deals_alex = load_deals_by_mode(deals_file, "Alexandria")
 
-            # 🔥 FIXED: BRAND BASED (NOT PRODUCT)
+            # Brand-based
             all_brands = set(
                 list(inv_zam["brand"].unique()) +
                 list(inv_alex["brand"].unique())
@@ -92,10 +92,14 @@ if st.button("Generate Reports"):
                 zam_qty = zam_inv_brand["available_quantity"].sum()
                 alex_qty = alex_inv_brand["available_quantity"].sum()
 
+                # Skip if no inventory anywhere
+                if zam_qty == 0 and alex_qty == 0:
+                    continue
+
+                # Determine branch type
                 if alex_qty > 0 and zam_qty > 0:
                     branch_type = "Merged"
                     deals_dict = deals_merged
-
                     brand_inventory = pd.concat(
                         [alex_inv_brand, zam_inv_brand],
                         ignore_index=True
@@ -106,30 +110,31 @@ if st.button("Generate Reports"):
                     deals_dict = deals_zam
                     brand_inventory = zam_inv_brand.copy()
 
-                elif alex_qty > 0:
+                else:
                     branch_type = "Alexandria"
                     deals_dict = deals_alex
                     brand_inventory = alex_inv_brand.copy()
 
-                else:
-                    continue
-
-                # SALES FILTER (by brand)
+                # Sales per brand
                 brand_sales = pd.concat([
                     sales_zam[sales_zam["brand"] == brand],
                     sales_alex[sales_alex["brand"] == brand]
                 ])
 
                 total_sales_qty = brand_sales["quantity"].sum()
+                total_inventory_qty = brand_inventory["available_quantity"].sum()
 
                 deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
                 percentage = deal["percentage"]
                 rent = deal["rent"]
 
-                if total_sales_qty == 0:
+                # Empty Guard logic (inventory > 0 and sales = 0)
+                if total_sales_qty == 0 and total_inventory_qty > 0:
                     subfolder = "Empty Brand Guard"
+
                 elif percentage == 0 and rent == 0:
                     subfolder = "No Deal"
+
                 else:
                     subfolder = None
 
@@ -152,7 +157,7 @@ if st.button("Generate Reports"):
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
         # ======================================================
-        # SINGLE MODE
+        # SINGLE BRANCH MODE
         # ======================================================
 
         else:
@@ -161,7 +166,6 @@ if st.button("Generate Reports"):
             inventory_df = pd.read_excel(inventory_file)
             deals_dict = load_deals_by_mode(deals_file, mode)
 
-            # 🔥 FIXED: BRAND BASED
             brands = inventory_df["brand"].unique()
 
             for brand in brands:
@@ -175,15 +179,22 @@ if st.button("Generate Reports"):
                 ]
 
                 total_sales_qty = brand_sales["quantity"].sum()
+                total_inventory_qty = brand_inventory["available_quantity"].sum()
+
+                # Skip completely if no inventory
+                if total_inventory_qty == 0:
+                    continue
 
                 deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
                 percentage = deal["percentage"]
                 rent = deal["rent"]
 
-                if total_sales_qty == 0:
+                if total_sales_qty == 0 and total_inventory_qty > 0:
                     subfolder = "Empty Brand Guard"
+
                 elif percentage == 0 and rent == 0:
                     subfolder = "No Deal"
+
                 else:
                     subfolder = None
 
@@ -205,7 +216,7 @@ if st.button("Generate Reports"):
 
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
-            # SUMMARY
+            # Build summary only in single mode
             summary_wb = build_branch_summary_workbook(
                 branch_name=mode,
                 payout_cycle=payout_cycle,
