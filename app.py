@@ -62,10 +62,6 @@ def load_brand_deals(deals_file, mode):
         return None, str(e)
 
 
-# ==========================================================
-# ZIP BUILDER
-# ==========================================================
-
 def build_reports_zip(brand_workbooks, mode):
 
     zip_buffer = BytesIO()
@@ -286,8 +282,14 @@ if st.button("Generate Reports"):
 
             if not brand_inventory.empty:
 
-                brand_inventory["alex_qty"] = brand_inventory.get("alex_qty", 0).fillna(0)
-                brand_inventory["zamalek_qty"] = brand_inventory.get("zamalek_qty", 0).fillna(0)
+                if "alex_qty" not in brand_inventory.columns:
+                    brand_inventory["alex_qty"] = 0
+
+                if "zamalek_qty" not in brand_inventory.columns:
+                    brand_inventory["zamalek_qty"] = 0
+
+                brand_inventory["alex_qty"] = brand_inventory["alex_qty"].fillna(0)
+                brand_inventory["zamalek_qty"] = brand_inventory["zamalek_qty"].fillna(0)
 
                 brand_inventory["quantity"] = (
                     brand_inventory["alex_qty"] +
