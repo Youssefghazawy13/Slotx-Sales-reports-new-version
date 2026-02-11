@@ -1,5 +1,6 @@
 from openpyxl import Workbook
 from io import BytesIO
+import pandas as pd
 
 from reports.sales_sheet import create_sales_sheet
 from reports.inventory_sheet import create_inventory_sheet
@@ -16,15 +17,24 @@ def build_brand_workbook(
     deals_dict: dict
 ):
 
-    # Defensive: ensure not None
+    # ==========================================
+    # Defensive Handling
+    # ==========================================
+
     if brand_sales is None:
-        brand_sales = []
+        brand_sales = pd.DataFrame()
 
     if brand_inventory is None:
-        brand_inventory = []
+        brand_inventory = pd.DataFrame()
 
-    # Skip empty brand (no data at all)
-    if len(brand_sales) == 0 and len(brand_inventory) == 0:
+    if not isinstance(brand_sales, pd.DataFrame):
+        brand_sales = pd.DataFrame(brand_sales)
+
+    if not isinstance(brand_inventory, pd.DataFrame):
+        brand_inventory = pd.DataFrame(brand_inventory)
+
+    # Skip completely empty brand
+    if brand_sales.empty and brand_inventory.empty:
         return None
 
     wb = Workbook()
@@ -34,36 +44,57 @@ def build_brand_workbook(
     wb.remove(default_sheet)
 
     # ==========================================
-    # Calculate Totals
+    # Calculate Sales Totals (SAFE)
     # ==========================================
 
     total_sales_qty = 0
     total_sales_money = 0
 
-    if len(brand_sales) > 0:
-        total_sales_qty = brand_sales["quantity"].sum()
-        total_sales_money = brand_sales["total"].sum()
+    if not brand_sales.empty:
+
+        if "quantity" in brand_sales.columns:
+            total_sales_qty = brand_sales["quantity"].sum()
+
+        if "total" in brand_sales.columns:
+            total_sales_money = brand_sales["total"].sum()
+
+    # ==========================================
+    # Calculate Inventory Totals (SAFE)
+    # ==========================================
 
     total_inventory_qty = 0
     total_inventory_value = 0
 
-    if len(brand_inventory) > 0:
+    if not brand_inventory.empty:
 
         if mode.lower() == "merged":
-            total_inventory_qty = (
-                brand_inventory.get("alex_qty", 0).sum()
-                + brand_inventory.get("zamalek_qty", 0).sum()
-            )
-        else:
-            total_inventory_qty = brand_inventory.get("quantity", 0).sum()
 
-        total_inventory_value = (
-            brand_inventory.get("price", 0) *
-            brand_inventory.get("quantity", 0)
-        ).sum()
+            alex_qty = (
+                brand_inventory["alex_qty"].sum()
+                if "alex_qty" in brand_inventory.columns else 0
+            )
+
+            zam_qty = (
+                brand_inventory["zamalek_qty"].sum()
+                if "zamalek_qty" in brand_inventory.columns else 0
+            )
+
+            total_inventory_qty = alex_qty + zam_qty
+
+        else:
+
+            if "quantity" in brand_inventory.columns:
+                total_inventory_qty = brand_inventory["quantity"].sum()
+
+        # Inventory Value
+        if "price" in brand_inventory.columns and "quantity" in brand_inventory.columns:
+            total_inventory_value = (
+                brand_inventory["price"] *
+                brand_inventory["quantity"]
+            ).sum()
 
     # ==========================================
-    # Create Sheets (Strict Order)
+    # Create Sheets (STRICT ORDER)
     # ==========================================
 
     create_sales_sheet(
