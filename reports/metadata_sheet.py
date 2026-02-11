@@ -12,12 +12,11 @@ def create_metadata_sheet(
     mode: str,
     payout_cycle: str
 ):
-    """
-    Create Metadata sheet (always last).
-    Logo appears at top-left (A1).
-    """
 
     ws = wb.create_sheet("Metadata")
+
+    dark_blue_font = Font(color="1F4E78")
+    bold_dark_blue_font = Font(bold=True, color="1F4E78")
 
     # -------------------------
     # Add Logo (Top-Left)
@@ -32,16 +31,12 @@ def create_metadata_sheet(
             img.height = 80
             ws.add_image(img, "A1")
         except Exception:
-            pass  # Prevent crash if image fails
+            pass
 
-    # Add spacing below logo
+    # Space under logo
     ws.append([""])
     ws.append([""])
     ws.append([""])
-
-    # -------------------------
-    # Metadata Content
-    # -------------------------
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -56,15 +51,14 @@ def create_metadata_sheet(
     for row in metadata_rows:
         ws.append(row)
 
-    # Bold first column
-    for row in ws.iter_rows(
-        min_row=ws.max_row - len(metadata_rows) + 1,
-        max_row=ws.max_row,
-        min_col=1,
-        max_col=1
-    ):
-        for cell in row:
-            if cell.value:
-                cell.font = Font(bold=True)
+    # Apply styling
+    start_row = ws.max_row - len(metadata_rows) + 1
+
+    for row in ws.iter_rows(min_row=start_row, max_row=ws.max_row):
+        label_cell = row[0]
+        value_cell = row[1]
+
+        label_cell.font = bold_dark_blue_font
+        value_cell.font = dark_blue_font
 
     auto_fit_columns(ws)
