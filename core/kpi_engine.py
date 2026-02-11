@@ -4,12 +4,6 @@ import pandas as pd
 
 
 def calculate_sales_totals(brand_sales: pd.DataFrame):
-    """
-    Returns:
-        total_sales_qty,
-        total_sales_money
-    """
-
     if brand_sales.empty:
         return 0, 0
 
@@ -20,12 +14,6 @@ def calculate_sales_totals(brand_sales: pd.DataFrame):
 
 
 def calculate_inventory_totals(brand_inventory: pd.DataFrame):
-    """
-    Returns:
-        total_inventory_qty,
-        total_inventory_value
-    """
-
     if brand_inventory.empty:
         return 0, 0
 
@@ -40,10 +28,6 @@ def calculate_inventory_totals(brand_inventory: pd.DataFrame):
 
 
 def apply_deal(total_sales_money, percentage, rent):
-    """
-    Apply percentage first, then rent.
-    """
-
     after_percentage = total_sales_money - (
         total_sales_money * percentage / 100
     )
@@ -54,10 +38,6 @@ def apply_deal(total_sales_money, percentage, rent):
 
 
 def get_best_selling_product(brand_sales: pd.DataFrame):
-    """
-    Return product with highest total quantity.
-    """
-
     if brand_sales.empty:
         return ""
 
@@ -75,11 +55,6 @@ def get_best_selling_product(brand_sales: pd.DataFrame):
 
 
 def get_best_selling_size(brand_sales: pd.DataFrame):
-    """
-    Extract size from product name using '-' split.
-    Example: 'Tshirt - L'
-    """
-
     if brand_sales.empty:
         return ""
 
@@ -100,23 +75,20 @@ def get_best_selling_size(brand_sales: pd.DataFrame):
     return max(size_sales, key=size_sales.get)
 
 
+# ✅ Status based ONLY on Inventory
 def calculate_status(
     sales_qty,
     inventory_qty,
     has_deal
 ):
-    """
-    Determine product-level status.
-    """
 
-    # Empty brand handled elsewhere
-    if inventory_qty < 5:
-        return "Low Stock"
+    if inventory_qty <= 2:
+        return "Critical"
 
-    if sales_qty <= 3:
-        return "Slow Moving"
+    if 3 <= inventory_qty <= 5:
+        return "Low"
 
-    if not has_deal:
-        return "No Deal"
+    if 6 <= inventory_qty <= 15:
+        return "Medium"
 
-    return "Healthy"
+    return "Good"
