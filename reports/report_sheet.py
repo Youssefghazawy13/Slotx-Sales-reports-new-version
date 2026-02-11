@@ -1,10 +1,12 @@
 # reports/report_sheet.py
 
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.chart import BarChart, Reference
 from utils.excel_helpers import auto_fit_columns, format_money_cell
-from core.kpi_engine import apply_deal
-from collections import Counter
+from core.kpi_engine import (
+    apply_deal,
+    get_best_selling_product,
+    get_best_selling_size
+)
 
 
 def create_report_sheet(
@@ -31,26 +33,26 @@ def create_report_sheet(
         rent
     )
 
-    # ======================================================
-    # KPI CARDS
-    # ======================================================
+    # =====================================================
+    # SMALL KPI CARDS (Dark Blue)
+    # =====================================================
 
-    def create_kpi_card(row, col, title, value, is_money=False):
+    def create_kpi_card(row, col, title, value):
 
         ws.merge_cells(start_row=row, start_column=col,
-                       end_row=row+2, end_column=col+2)
+                       end_row=row+1, end_column=col+2)
 
         cell = ws.cell(row=row, column=col)
         cell.value = f"{title}\n{value}"
 
-        cell.font = Font(size=14, bold=True)
+        cell.font = Font(size=12, bold=True, color="FFFFFF")
         cell.alignment = Alignment(horizontal="center",
                                    vertical="center",
                                    wrap_text=True)
 
         fill = PatternFill(
-            start_color="E8EEF7",
-            end_color="E8EEF7",
+            start_color="0A1F5C",
+            end_color="0A1F5C",
             fill_type="solid"
         )
 
@@ -61,32 +63,69 @@ def create_report_sheet(
             bottom=Side(style="thin")
         )
 
-        for r in range(row, row+3):
+        for r in range(row, row+2):
             for c in range(col, col+3):
                 ws.cell(row=r, column=c).fill = fill
                 ws.cell(row=r, column=c).border = border
 
-    # Row 2 Cards
-    create_kpi_card(2, 1, "Total Sales", f"{total_sales_money:,.2f} EGP")
-    create_kpi_card(2, 5, "Net After Deal", f"{after_rent:,.2f} EGP")
-    create_kpi_card(2, 9, "Inventory Units", total_inventory_qty)
+    create_kpi_card(2, 1, "Total Sales",
+                    f"{total_sales_money:,.2f} EGP")
 
-    # Count Critical items
-    critical_count = 0
-    if not brand_sales.empty:
-        # simple logic placeholder (can link with inventory later)
-        pass
+    create_kpi_card(2, 5, "Net After Deal",
+                    f"{after_rent:,.2f} EGP")
 
-    create_kpi_card(2, 13, "Critical Items", critical_count)
+    create_kpi_card(2, 9, "Inventory Units",
+                    total_inventory_qty)
 
-    # ======================================================
-    # TOP 3 PRODUCTS DATA
-    # ======================================================
+    # =====================================================
+    # BASIC REPORT INFO (زي القديم)
+    # =====================================================
 
-    start_row = 8
+    start_row = 6
 
     ws.cell(row=start_row, column=1,
-            value="📊 Top 3 Products Performance").font = Font(size=14, bold=True)
+            value="Branch Name:").font = Font(bold=True)
+    ws.cell(row=start_row, column=2, value=mode)
+
+    ws.cell(row=start_row+1, column=1,
+            value="Brand Name:").font = Font(bold=True)
+    ws.cell(row=start_row+1, column=2, value=brand_name)
+
+    ws.cell(row=start_row+2, column=1,
+            value="Payout Cycle:").font = Font(bold=True)
+    ws.cell(row=start_row+2, column=2, value=payout_cycle)
+
+    ws.cell(row=start_row+3, column=1,
+            value="Total Sales Quantity:").font = Font(bold=True)
+    ws.cell(row=start_row+3, column=2, value=total_sales_qty)
+
+    ws.cell(row=start_row+4, column=1,
+            value="Total Inventory Quantity:").font = Font(bold=True)
+    ws.cell(row=start_row+4, column=2, value=total_inventory_qty)
+
+    ws.cell(row=start_row+5, column=1,
+            value="Total Inventory Value:").font = Font(bold=True)
+    ws.cell(row=start_row+5, column=2,
+            value=f"{total_inventory_value:,.2f} EGP")
+
+    ws.cell(row=start_row+6, column=1,
+            value="After Percentage:").font = Font(bold=True)
+    ws.cell(row=start_row+6, column=2,
+            value=f"{after_percentage:,.2f} EGP")
+
+    ws.cell(row=start_row+7, column=1,
+            value="After Rent:").font = Font(bold=True)
+    ws.cell(row=start_row+7, column=2,
+            value=f"{after_rent:,.2f} EGP")
+
+    # =====================================================
+    # TOP PRODUCTS SECTION (بدون Chart)
+    # =====================================================
+
+    top_start = start_row + 10
+
+    ws.cell(row=top_start, column=1,
+            value="Top Products").font = Font(size=13, bold=True)
 
     product_sales = (
         brand_sales.groupby("product_name")["quantity"]
@@ -95,55 +134,18 @@ def create_report_sheet(
         .head(3)
     )
 
-    products = product_sales.index.tolist()
+    row_pointer = top_start + 2
 
-    ws.cell(row=start_row+1, column=1, value="Product")
-    ws.cell(row=start_row+1, column=2, value="Sales Units")
-    ws.cell(row=start_row+1, column=3, value="Inventory Units")
+    for product, qty in product_sales.items():
+        revenue = brand_sales[
+            brand_sales["product_name"] == product
+        ]["total"].sum()
 
-    data_row = start_row + 2
+        ws.cell(row=row_pointer, column=1, value=product)
+        ws.cell(row=row_pointer, column=2, value=qty)
+        ws.cell(row=row_pointer, column=3,
+                value=f"{revenue:,.2f} EGP")
 
-    for product in products:
-
-        sales_units = product_sales[product]
-
-        # Inventory lookup placeholder
-        inventory_units = 0
-
-        ws.cell(row=data_row, column=1, value=product)
-        ws.cell(row=data_row, column=2, value=sales_units)
-        ws.cell(row=data_row, column=3, value=inventory_units)
-
-        data_row += 1
-
-    # ======================================================
-    # HORIZONTAL BAR CHART
-    # ======================================================
-
-    chart = BarChart()
-    chart.type = "bar"   # Horizontal
-    chart.style = 10
-    chart.title = "Top 3 Products"
-    chart.y_axis.title = "Products"
-    chart.x_axis.title = "Units"
-
-    data = Reference(ws,
-                     min_col=2,
-                     min_row=start_row+1,
-                     max_row=data_row-1,
-                     max_col=3)
-
-    cats = Reference(ws,
-                     min_col=1,
-                     min_row=start_row+2,
-                     max_row=data_row-1)
-
-    chart.add_data(data, titles_from_data=True)
-    chart.set_categories(cats)
-
-    chart.height = 7
-    chart.width = 18
-
-    ws.add_chart(chart, f"E{start_row+2}")
+        row_pointer += 1
 
     auto_fit_columns(ws)
