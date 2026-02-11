@@ -25,7 +25,7 @@ def create_metadata_sheet(wb, report_title, branch_name, payout_cycle):
     # SLOT-X TEXT (Centered & Large)
     # =========================================
 
-    ws.merge_cells("A1:I5")
+    ws.merge_cells("A1:E5")
 
     title_cell = ws["A1"]
     title_cell.value = "SLOT-X"
