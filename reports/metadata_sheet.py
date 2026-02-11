@@ -19,32 +19,31 @@ def create_metadata_sheet(
     bold_dark_blue_font = Font(bold=True, color="1F4E78")
 
     # -------------------------
-    # Add Logo (Top-Left)
+    # Create header space for logo
     # -------------------------
 
-    logo_path = os.path.join("assets", "logo.png")
+    ws.merge_cells("A1:D6")
 
-    logo_height_rows = 6  # عدد الصفوف اللي هنحجزهم للصورة
+    # Increase row height
+    for i in range(1, 7):
+        ws.row_dimensions[i].height = 25
+
+    logo_path = os.path.join("assets", "logo.png")
 
     if os.path.exists(logo_path):
         try:
             img = Image(logo_path)
-            img.width = 160
-            img.height = 90
+            img.width = 220
+            img.height = 110
             ws.add_image(img, "A1")
-
-            # نزود ارتفاع الصفوف الأولى
-            for i in range(1, logo_height_rows + 1):
-                ws.row_dimensions[i].height = 22
-
         except Exception as e:
             print("Logo load error:", e)
 
     # -------------------------
-    # Start writing metadata AFTER logo area
+    # Metadata content below logo
     # -------------------------
 
-    start_row = logo_height_rows + 2
+    start_row = 8
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
