@@ -2,10 +2,9 @@ import streamlit as st
 import pandas as pd
 import zipfile
 from io import BytesIO
-from datetime import datetime
 
 from reports.workbook_builder import build_brand_workbook
-from reports.all_brands_summary import build_all_brands_summary
+from reports.branch_summary_workbook import build_branch_summary_workbook
 from core.deals_loader import load_branch_deals
 
 
@@ -17,9 +16,9 @@ st.set_page_config(
 
 st.title("Slot-X Sales & Inventory Reports")
 
-# ==============================
-# MODE SELECTION
-# ==============================
+# =====================================
+# MODE
+# =====================================
 
 mode = st.selectbox(
     "Select Mode",
@@ -33,9 +32,9 @@ payout_cycle = st.selectbox(
 
 st.divider()
 
-# ==============================
+# =====================================
 # FILE UPLOADS
-# ==============================
+# =====================================
 
 if mode == "Merged":
 
@@ -53,9 +52,9 @@ else:
     inventory_file = st.file_uploader("Upload Inventory File")
     deals_file = st.file_uploader("Upload Deals File")
 
-# ==============================
-# GENERATE BUTTON
-# ==============================
+# =====================================
+# GENERATE
+# =====================================
 
 if st.button("Generate Reports"):
 
@@ -63,9 +62,9 @@ if st.button("Generate Reports"):
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
 
-        # ==========================================
+        # ======================================================
         # MERGED MODE
-        # ==========================================
+        # ======================================================
 
         if mode == "Merged":
 
@@ -92,9 +91,9 @@ if st.button("Generate Reports"):
                 zam_qty = zam_inv_brand["available_quantity"].sum()
                 alex_qty = alex_inv_brand["available_quantity"].sum()
 
-                # --------------------------
+                # ------------------------------
                 # DETERMINE BRANCH TYPE
-                # --------------------------
+                # ------------------------------
 
                 if alex_qty > 0 and zam_qty > 0:
                     branch_type = "Merged"
@@ -126,9 +125,9 @@ if st.button("Generate Reports"):
                 else:
                     continue
 
-                # --------------------------
-                # SALES FILTER
-                # --------------------------
+                # ------------------------------
+                # SALES
+                # ------------------------------
 
                 brand_sales = pd.concat([
                     sales_zam[sales_zam["name_ar"] == brand],
@@ -141,9 +140,9 @@ if st.button("Generate Reports"):
                 percentage = deal["percentage"]
                 rent = deal["rent"]
 
-                # --------------------------
-                # DETERMINE SUBFOLDER
-                # --------------------------
+                # ------------------------------
+                # SUBFOLDER LOGIC
+                # ------------------------------
 
                 if total_sales_qty == 0:
                     subfolder = "Empty Brand Guard"
@@ -154,9 +153,9 @@ if st.button("Generate Reports"):
                 else:
                     subfolder = None
 
-                # --------------------------
+                # ------------------------------
                 # BUILD REPORT
-                # --------------------------
+                # ------------------------------
 
                 workbook_buffer = build_brand_workbook(
                     brand_name=brand,
@@ -176,9 +175,9 @@ if st.button("Generate Reports"):
 
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
-        # ==========================================
+        # ======================================================
         # SINGLE BRANCH MODE
-        # ==========================================
+        # ======================================================
 
         else:
 
@@ -190,8 +189,13 @@ if st.button("Generate Reports"):
 
             for brand in brands:
 
-                brand_inventory = inventory_df[inventory_df["name_en"] == brand]
-                brand_sales = sales_df[sales_df["name_ar"] == brand]
+                brand_inventory = inventory_df[
+                    inventory_df["name_en"] == brand
+                ]
+
+                brand_sales = sales_df[
+                    sales_df["name_ar"] == brand
+                ]
 
                 total_sales_qty = brand_sales["quantity"].sum()
 
@@ -226,8 +230,11 @@ if st.button("Generate Reports"):
 
                 zip_file.writestr(file_path, workbook_buffer.getvalue())
 
-            # SUMMARY ONLY FOR SINGLE MODE
-            summary_buffer = build_all_brands_summary(
+            # ----------------------------------------
+            # BRANCH SUMMARY (ONLY SINGLE MODE)
+            # ----------------------------------------
+
+            summary_wb = build_branch_summary_workbook(
                 branch_name=mode,
                 payout_cycle=payout_cycle,
                 sales_df=sales_df,
@@ -235,8 +242,11 @@ if st.button("Generate Reports"):
                 deals_dict=deals_dict
             )
 
+            summary_buffer = BytesIO()
+            summary_wb.save(summary_buffer)
+
             zip_file.writestr(
-                f"Reports/{mode}/All_Brands_Summary.xlsx",
+                f"Reports/{mode}/{mode}_Summary.xlsx",
                 summary_buffer.getvalue()
             )
 
