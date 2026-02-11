@@ -18,7 +18,7 @@ def create_metadata_sheet(wb, report_title, branch_name, payout_cycle):
     )
 
     for row in range(1, 6):
-        for col in range(1, 10):
+        for col in range(1, 7):
             ws.cell(row=row, column=col).fill = dark_blue
 
     # =========================================
