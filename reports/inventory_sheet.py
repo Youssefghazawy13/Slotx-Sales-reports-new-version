@@ -1,159 +1,169 @@
-from openpyxl.styles import Font
-from utils.excel_helpers import (
-    auto_fit_columns,
-    apply_header_style,
-    get_status_fill,
-    format_money_cell
-)
-from core.kpi_engine import calculate_status
+from openpyxl.styles import Font, PatternFill
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from utils.excel_helpers import auto_fit_columns
 
 
-def create_inventory_sheet_single(
+def get_status(qty):
+
+    if qty <= 2:
+        return "Critical"
+    elif qty <= 5:
+        return "Low"
+    elif qty <= 10:
+        return "Medium"
+    else:
+        return "Good"
+
+
+def create_inventory_sheet(
     wb,
-    brand_name,
-    mode,
     brand_inventory,
-    brand_sales,
-    has_deal
+    mode: str
 ):
 
     ws = wb.create_sheet("Inventory")
 
-    headers = [
-        "Branch Name",
-        "Brand Name",
-        "Product Name",
-        "Barcode",
-        "Unit Price",
-        "Available Quantity",
-        "Status"
-    ]
+    is_merged = mode.lower() == "merged"
+
+    if is_merged:
+        headers = [
+            "Product",
+            "Barcode",
+            "Price",
+            "Alex Qty",
+            "Zamalek Qty",
+            "Total Qty",
+            "Status",
+            "Notes"
+        ]
+    else:
+        headers = [
+            "Product",
+            "Barcode",
+            "Price",
+            "Quantity",
+            "Status",
+            "Notes"
+        ]
 
     ws.append(headers)
-    apply_header_style(ws)
 
-    total_inventory_qty = 0
-    total_inventory_value = 0
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    critical_count = 0
 
     for _, row in brand_inventory.iterrows():
 
-        barcode = row.get("barcode")
-        qty = row.get("available_quantity", 0)
-        price = row.get("unit_price", 0)
+        product = row.get("product_name", "")
+        barcode = row.get("barcode", "")
+        price = row.get("price", 0)
 
-        sales_qty = brand_sales[
-            brand_sales["barcode"] == barcode
-        ]["quantity"].sum()
+        if is_merged:
+            alex_qty = row.get("alex_qty", 0)
+            zam_qty = row.get("zamalek_qty", 0)
+            total_qty = alex_qty + zam_qty
+            status = get_status(total_qty)
 
-        status = calculate_status(
-            sales_qty,
-            qty,
-            has_deal
-        )
+            ws.append([
+                product,
+                barcode,
+                price,
+                alex_qty,
+                zam_qty,
+                total_qty,
+                status,
+                ""
+            ])
 
-        ws.append([
-            mode,
-            brand_name,
-            row.get("product_name", ""),
-            barcode,
-            price,
-            qty,
-            status
-        ])
+            qty_for_status = total_qty
 
-        format_money_cell(ws.cell(row=ws.max_row, column=5))
-        ws.cell(row=ws.max_row, column=7).fill = get_status_fill(status)
+        else:
+            qty = row.get("quantity", 0)
+            status = get_status(qty)
 
-        total_inventory_qty += qty
-        total_inventory_value += qty * price
+            ws.append([
+                product,
+                barcode,
+                price,
+                qty,
+                status,
+                ""
+            ])
 
-    auto_fit_columns(ws)
+            qty_for_status = qty
 
-    return total_inventory_qty, total_inventory_value
+        if qty_for_status <= 2:
+            critical_count += 1
 
+    # ========================================
+    # Notes Logic
+    # ========================================
 
-def create_inventory_sheet_merged(
-    wb,
-    brand_name,
-    inventory_alex,
-    inventory_zam,
-    brand_sales,
-    has_deal
-):
+    if critical_count >= 3 and ws.max_row > 1:
+        ws.cell(row=2, column=len(headers)).value = \
+            "⚠ Brand requires urgent restocking"
 
-    ws = wb.create_sheet("Inventory")
+    # ========================================
+    # Thousand format for price
+    # ========================================
 
-    headers = [
-        "Brand Name",
-        "Product Name",
-        "Barcode",
-        "Unit Price",
-        "Alexandria Quantity",
-        "Zamalek Quantity",
-        "Total Stock",
-        "Status"
-    ]
+    for row in ws.iter_rows(min_row=2, min_col=3, max_col=3):
+        for cell in row:
+            cell.number_format = '#,##0.00'
 
-    ws.append(headers)
-    apply_header_style(ws)
+    # ========================================
+    # Color Status Column
+    # ========================================
 
-    merged_inventory = {}
+    status_col = headers.index("Status") + 1
 
-    for _, row in inventory_alex.iterrows():
-        barcode = row.get("barcode")
-        merged_inventory.setdefault(barcode, {
-            "product_name": row.get("product_name", ""),
-            "unit_price": row.get("unit_price", 0),
-            "alex_qty": 0,
-            "zam_qty": 0
-        })
-        merged_inventory[barcode]["alex_qty"] += row.get("available_quantity", 0)
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        status_cell = row[status_col - 1]
 
-    for _, row in inventory_zam.iterrows():
-        barcode = row.get("barcode")
-        merged_inventory.setdefault(barcode, {
-            "product_name": row.get("product_name", ""),
-            "unit_price": row.get("unit_price", 0),
-            "alex_qty": 0,
-            "zam_qty": 0
-        })
-        merged_inventory[barcode]["zam_qty"] += row.get("available_quantity", 0)
+        if status_cell.value == "Critical":
+            status_cell.fill = PatternFill(
+                start_color="FFC7CE",
+                end_color="FFC7CE",
+                fill_type="solid"
+            )
+        elif status_cell.value == "Low":
+            status_cell.fill = PatternFill(
+                start_color="FFEB9C",
+                end_color="FFEB9C",
+                fill_type="solid"
+            )
+        elif status_cell.value == "Medium":
+            status_cell.fill = PatternFill(
+                start_color="C6EFCE",
+                end_color="C6EFCE",
+                fill_type="solid"
+            )
+        elif status_cell.value == "Good":
+            status_cell.fill = PatternFill(
+                start_color="A9D08E",
+                end_color="A9D08E",
+                fill_type="solid"
+            )
 
-    total_inventory_qty = 0
-    total_inventory_value = 0
+    # ========================================
+    # Excel Table Style
+    # ========================================
 
-    for barcode, data in merged_inventory.items():
+    table = Table(
+        displayName="InventoryTable",
+        ref=ws.dimensions
+    )
 
-        total_stock = data["alex_qty"] + data["zam_qty"]
-        price = data["unit_price"]
+    style = TableStyleInfo(
+        name="TableStyleMedium9",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False
+    )
 
-        sales_qty = brand_sales[
-            brand_sales["barcode"] == barcode
-        ]["quantity"].sum()
-
-        status = calculate_status(
-            sales_qty,
-            total_stock,
-            has_deal
-        )
-
-        ws.append([
-            brand_name,
-            data["product_name"],
-            barcode,
-            price,
-            data["alex_qty"],
-            data["zam_qty"],
-            total_stock,
-            status
-        ])
-
-        format_money_cell(ws.cell(row=ws.max_row, column=4))
-        ws.cell(row=ws.max_row, column=8).fill = get_status_fill(status)
-
-        total_inventory_qty += total_stock
-        total_inventory_value += total_stock * price
+    table.tableStyleInfo = style
+    ws.add_table(table)
 
     auto_fit_columns(ws)
-
-    return total_inventory_qty, total_inventory_value
