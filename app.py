@@ -6,6 +6,10 @@ import zipfile
 from reports.workbook_builder import build_brand_workbook
 
 
+# ==========================================================
+# PAGE CONFIG
+# ==========================================================
+
 st.set_page_config(
     page_title="Slot-X Sales & Inventory Reports",
     layout="centered"
@@ -14,28 +18,21 @@ st.set_page_config(
 st.title("Slot-X Sales & Inventory Reports")
 
 
-# ============================================
-# DEALS LOADER (LOCAL - NO CORE IMPORT)
-# ============================================
+# ==========================================================
+# LOAD DEALS FROM MULTI-TAB FILE
+# ==========================================================
 
 def load_brand_deals(deals_file, mode: str):
 
     try:
         deals_df = pd.read_excel(deals_file, sheet_name=mode)
-
         deals_df.columns = deals_df.columns.str.strip()
-
-        deals_df["Brand Name"] = (
-            deals_df["Brand Name"]
-            .astype(str)
-            .str.strip()
-        )
 
         deals_dict = {}
 
         for _, row in deals_df.iterrows():
 
-            brand = row.get("Brand Name")
+            brand = str(row.get("Brand Name", "")).strip()
 
             if not brand:
                 continue
@@ -51,9 +48,9 @@ def load_brand_deals(deals_file, mode: str):
         return None, str(e)
 
 
-# ============================================
-# ZIP BUILDER
-# ============================================
+# ==========================================================
+# BUILD ZIP STRUCTURE
+# ==========================================================
 
 def build_reports_zip(brand_workbooks):
 
@@ -87,9 +84,9 @@ def build_reports_zip(brand_workbooks):
     return zip_buffer
 
 
-# ============================================
+# ==========================================================
 # UI
-# ============================================
+# ==========================================================
 
 mode = st.selectbox(
     "Select Mode",
@@ -124,9 +121,9 @@ deals_file = st.file_uploader("Deals File (Multi-tab)", type=["xlsx"])
 st.divider()
 
 
-# ============================================
+# ==========================================================
 # GENERATE
-# ============================================
+# ==========================================================
 
 if st.button("Generate Reports"):
 
@@ -142,7 +139,9 @@ if st.button("Generate Reports"):
 
     brand_workbooks = {}
 
-    # ---------------- SINGLE ----------------
+    # ======================================================
+    # SINGLE MODE
+    # ======================================================
 
     if mode != "Merged":
 
@@ -152,6 +151,9 @@ if st.button("Generate Reports"):
 
         sales_df = pd.read_excel(sales_file)
         inventory_df = pd.read_excel(inventory_file)
+
+        sales_df.columns = sales_df.columns.str.strip()
+        inventory_df.columns = inventory_df.columns.str.strip()
 
         brands = pd.concat([
             sales_df["brand"],
@@ -180,7 +182,9 @@ if st.button("Generate Reports"):
                 "has_sales": not brand_sales.empty
             }
 
-    # ---------------- MERGED ----------------
+    # ======================================================
+    # MERGED MODE
+    # ======================================================
 
     else:
 
@@ -190,9 +194,11 @@ if st.button("Generate Reports"):
 
         sales_alex_df = pd.read_excel(sales_alex)
         sales_zam_df = pd.read_excel(sales_zam)
-
         inventory_alex_df = pd.read_excel(inventory_alex)
         inventory_zam_df = pd.read_excel(inventory_zam)
+
+        for df in [sales_alex_df, sales_zam_df, inventory_alex_df, inventory_zam_df]:
+            df.columns = df.columns.str.strip()
 
         brands = pd.concat([
             sales_alex_df["brand"],
@@ -206,16 +212,56 @@ if st.button("Generate Reports"):
             brand_sales = pd.concat([
                 sales_alex_df[sales_alex_df["brand"] == brand],
                 sales_zam_df[sales_zam_df["brand"] == brand]
-            ])
+            ], ignore_index=True)
 
-            brand_inventory = pd.concat([
-                inventory_alex_df[inventory_alex_df["brand"] == brand],
-                inventory_zam_df[inventory_zam_df["brand"] == brand]
-            ])
+            alex_inv = inventory_alex_df[inventory_alex_df["brand"] == brand].copy()
+            zam_inv = inventory_zam_df[inventory_zam_df["brand"] == brand].copy()
+
+            if "quantity" in alex_inv.columns:
+                alex_inv.rename(columns={"quantity": "alex_qty"}, inplace=True)
+
+            if "quantity" in zam_inv.columns:
+                zam_inv.rename(columns={"quantity": "zamalek_qty"}, inplace=True)
+
+            if not alex_inv.empty and not zam_inv.empty:
+
+                brand_inventory = pd.merge(
+                    alex_inv,
+                    zam_inv,
+                    on=["brand", "barcode"],
+                    how="outer"
+                )
+
+            elif not alex_inv.empty:
+                brand_inventory = alex_inv.copy()
+                brand_inventory["zamalek_qty"] = 0
+
+            elif not zam_inv.empty:
+                brand_inventory = zam_inv.copy()
+                brand_inventory["alex_qty"] = 0
+
+            else:
+                brand_inventory = pd.DataFrame()
+
+            if not brand_inventory.empty:
+
+                if "alex_qty" not in brand_inventory.columns:
+                    brand_inventory["alex_qty"] = 0
+
+                if "zamalek_qty" not in brand_inventory.columns:
+                    brand_inventory["zamalek_qty"] = 0
+
+                brand_inventory["alex_qty"] = brand_inventory["alex_qty"].fillna(0)
+                brand_inventory["zamalek_qty"] = brand_inventory["zamalek_qty"].fillna(0)
+
+                brand_inventory["quantity"] = (
+                    brand_inventory["alex_qty"] +
+                    brand_inventory["zamalek_qty"]
+                )
 
             workbook_buffer = build_brand_workbook(
                 brand_name=brand,
-                mode=mode,
+                mode="Merged",
                 payout_cycle=payout_cycle,
                 brand_sales=brand_sales,
                 brand_inventory=brand_inventory,
