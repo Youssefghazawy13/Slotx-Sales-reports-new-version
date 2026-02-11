@@ -13,7 +13,7 @@ def create_metadata_sheet(wb, report_title, branch_name, payout_cycle):
 
     dark_blue = PatternFill(
         start_color="0A1F5C",
-        end_color="0F2A66",
+        end_color="0A1F5C",
         fill_type="solid"
     )
 
