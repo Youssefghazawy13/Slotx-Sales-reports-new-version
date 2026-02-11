@@ -7,7 +7,7 @@ from reports.workbook_builder import build_brand_workbook
 
 
 # ==========================================================
-# PAGE CONFIG
+# CONFIG
 # ==========================================================
 
 st.set_page_config(
@@ -19,8 +19,22 @@ st.title("Slot-X Sales & Inventory Reports")
 
 
 # ==========================================================
-# LOAD DEALS FROM MULTI-TAB FILE
+# HELPERS
 # ==========================================================
+
+def detect_brand_col(df):
+    for col in df.columns:
+        if col.lower().strip() in ["brand", "brand name"]:
+            return col
+    return None
+
+
+def detect_barcode_col(df):
+    for col in df.columns:
+        if col.lower().strip() in ["barcode", "barcodes", "sku", "code"]:
+            return col
+    return None
+
 
 def load_brand_deals(deals_file, mode: str):
 
@@ -47,10 +61,6 @@ def load_brand_deals(deals_file, mode: str):
     except Exception as e:
         return None, str(e)
 
-
-# ==========================================================
-# BUILD ZIP STRUCTURE
-# ==========================================================
 
 def build_reports_zip(brand_workbooks):
 
@@ -155,15 +165,18 @@ if st.button("Generate Reports"):
         sales_df.columns = sales_df.columns.str.strip()
         inventory_df.columns = inventory_df.columns.str.strip()
 
+        sales_brand_col = detect_brand_col(sales_df)
+        inv_brand_col = detect_brand_col(inventory_df)
+
         brands = pd.concat([
-            sales_df["brand"],
-            inventory_df["brand"]
+            sales_df[sales_brand_col],
+            inventory_df[inv_brand_col]
         ]).dropna().unique()
 
         for brand in brands:
 
-            brand_sales = sales_df[sales_df["brand"] == brand]
-            brand_inventory = inventory_df[inventory_df["brand"] == brand]
+            brand_sales = sales_df[sales_df[sales_brand_col] == brand]
+            brand_inventory = inventory_df[inventory_df[inv_brand_col] == brand]
 
             workbook_buffer = build_brand_workbook(
                 brand_name=brand,
@@ -200,22 +213,36 @@ if st.button("Generate Reports"):
         for df in [sales_alex_df, sales_zam_df, inventory_alex_df, inventory_zam_df]:
             df.columns = df.columns.str.strip()
 
+        sales_brand_col_alex = detect_brand_col(sales_alex_df)
+        sales_brand_col_zam = detect_brand_col(sales_zam_df)
+
+        inv_brand_col_alex = detect_brand_col(inventory_alex_df)
+        inv_brand_col_zam = detect_brand_col(inventory_zam_df)
+
+        inv_barcode_col_alex = detect_barcode_col(inventory_alex_df)
+        inv_barcode_col_zam = detect_barcode_col(inventory_zam_df)
+
         brands = pd.concat([
-            sales_alex_df["brand"],
-            sales_zam_df["brand"],
-            inventory_alex_df["brand"],
-            inventory_zam_df["brand"]
+            sales_alex_df[sales_brand_col_alex],
+            sales_zam_df[sales_brand_col_zam],
+            inventory_alex_df[inv_brand_col_alex],
+            inventory_zam_df[inv_brand_col_zam]
         ]).dropna().unique()
 
         for brand in brands:
 
             brand_sales = pd.concat([
-                sales_alex_df[sales_alex_df["brand"] == brand],
-                sales_zam_df[sales_zam_df["brand"] == brand]
+                sales_alex_df[sales_alex_df[sales_brand_col_alex] == brand],
+                sales_zam_df[sales_zam_df[sales_brand_col_zam] == brand]
             ], ignore_index=True)
 
-            alex_inv = inventory_alex_df[inventory_alex_df["brand"] == brand].copy()
-            zam_inv = inventory_zam_df[inventory_zam_df["brand"] == brand].copy()
+            alex_inv = inventory_alex_df[
+                inventory_alex_df[inv_brand_col_alex] == brand
+            ].copy()
+
+            zam_inv = inventory_zam_df[
+                inventory_zam_df[inv_brand_col_zam] == brand
+            ].copy()
 
             if "quantity" in alex_inv.columns:
                 alex_inv.rename(columns={"quantity": "alex_qty"}, inplace=True)
@@ -223,12 +250,18 @@ if st.button("Generate Reports"):
             if "quantity" in zam_inv.columns:
                 zam_inv.rename(columns={"quantity": "zamalek_qty"}, inplace=True)
 
+            if inv_barcode_col_alex:
+                alex_inv.rename(columns={inv_barcode_col_alex: "barcode"}, inplace=True)
+
+            if inv_barcode_col_zam:
+                zam_inv.rename(columns={inv_barcode_col_zam: "barcode"}, inplace=True)
+
             if not alex_inv.empty and not zam_inv.empty:
 
                 brand_inventory = pd.merge(
                     alex_inv,
                     zam_inv,
-                    on=["brand", "barcode"],
+                    on="barcode",
                     how="outer"
                 )
 
