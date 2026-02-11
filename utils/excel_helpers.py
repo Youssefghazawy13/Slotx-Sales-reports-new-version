@@ -4,10 +4,6 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 
-# -------------------------
-# AUTO FIT
-# -------------------------
-
 def auto_fit_columns(ws):
     for column in ws.columns:
         max_length = 0
@@ -25,10 +21,6 @@ def auto_fit_columns(ws):
         adjusted_width = max(12, min(max_length + 3, 50))
         ws.column_dimensions[column_letter].width = adjusted_width
 
-
-# -------------------------
-# HEADER STYLE
-# -------------------------
 
 def apply_header_style(ws):
 
@@ -59,17 +51,13 @@ def apply_header_style(ws):
     ws.freeze_panes = "A2"
 
 
-# -------------------------
-# STATUS COLORING
-# -------------------------
-
 def get_status_fill(status):
 
     colors = {
-        "Low Stock": "FF4C4C",
-        "Slow Moving": "FFA500",
-        "No Deal": "9E9E9E",
-        "Healthy": "2E7D32"
+        "Critical": "FF4C4C",
+        "Low": "FFA500",
+        "Medium": "FFD966",
+        "Good": "2E7D32"
     }
 
     return PatternFill(
@@ -78,10 +66,6 @@ def get_status_fill(status):
         fill_type="solid"
     )
 
-
-# -------------------------
-# MONEY FORMAT
-# -------------------------
 
 def format_money_cell(cell):
     cell.number_format = '#,##0.00'
