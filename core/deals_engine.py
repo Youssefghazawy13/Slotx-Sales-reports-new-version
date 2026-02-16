@@ -3,29 +3,31 @@ import re
 
 
 # =====================================================
-# SMART BRAND NORMALIZATION
+# SMART BRAND NORMALIZATION (FINAL VERSION)
 # =====================================================
 
 def normalize_brand_name(name: str) -> str:
     """
-    Smart normalization:
-    - Remove leading/trailing spaces
-    - Lowercase everything
-    - Remove spaces inside
-    - Remove dashes
-    - Remove underscores
-    - Remove any special characters
+    Ultra smart normalization:
+    - Handle NaN safely
+    - Remove weird Excel spaces
+    - Lowercase
+    - Remove ALL non-alphanumeric characters
+    - Collapse everything into pure letters+numbers
     """
 
-    if not name:
+    if pd.isna(name):
         return ""
 
-    name = str(name).strip().lower()
+    name = str(name)
 
-    # remove spaces, dashes, underscores
-    name = re.sub(r"[\s\-_]+", "", name)
+    # remove weird excel spaces
+    name = name.replace("\xa0", " ")
 
-    # remove any non-alphanumeric characters
+    # lowercase
+    name = name.lower().strip()
+
+    # remove ANY character that is not letter or number
     name = re.sub(r"[^a-z0-9]", "", name)
 
     return name
