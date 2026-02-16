@@ -15,6 +15,19 @@ def create_performance_sheet(
     ws = wb.create_sheet("Performance")
 
     # =====================================================
+    # 🔥 IMPORTANT FIX — NORMALIZE BEFORE GROUPING
+    # =====================================================
+
+    sales_df = sales_df.copy()
+    inventory_df = inventory_df.copy()
+
+    sales_df["brand_original"] = sales_df["brand"]
+    inventory_df["brand_original"] = inventory_df["brand"]
+
+    sales_df["brand"] = sales_df["brand"].astype(str).apply(normalize_brand_name)
+    inventory_df["brand"] = inventory_df["brand"].astype(str).apply(normalize_brand_name)
+
+    # =====================================================
     # GROUP SALES PER BRAND
     # =====================================================
 
@@ -22,7 +35,8 @@ def create_performance_sheet(
         sales_df.groupby("brand")
         .agg({
             "quantity": "sum",
-            "total": "sum"
+            "total": "sum",
+            "brand_original": "first"
         })
         .reset_index()
     )
@@ -53,7 +67,7 @@ def create_performance_sheet(
     )
 
     # =====================================================
-    # MERGE ON BRAND
+    # MERGE ON NORMALIZED BRAND
     # =====================================================
 
     summary_df = sales_grouped.merge(
@@ -77,9 +91,7 @@ def create_performance_sheet(
 
     for _, row in summary_df.iterrows():
 
-        brand = row["brand"]
-        normalized_brand = normalize_brand_name(brand)
-
+        normalized_brand = row["brand"]
         sales_money = row["total"]
 
         deal = deals_dict.get(
@@ -107,7 +119,7 @@ def create_performance_sheet(
     summary_df["after_all"] = after_all_list
 
     # =====================================================
-    # KPI CARDS (5 SIDE BY SIDE)
+    # KPI CARDS
     # =====================================================
 
     total_sales_money = summary_df["total"].sum()
@@ -155,7 +167,6 @@ def create_performance_sheet(
         ws[f"{col_letter}2"].alignment = Alignment(horizontal="center")
 
         ws[f"{col_letter}2"].number_format = '#,##0.00 "EGP"'
-
         ws.column_dimensions[col_letter].width = 26
 
     # =====================================================
@@ -196,7 +207,7 @@ def create_performance_sheet(
     for _, row in summary_df.iterrows():
         ws.append([
             row["Rank"],
-            row["brand"],
+            row["brand_original"],  # 🔥 show original name
             row["quantity"],
             row["total"],
             row["after_percentage"],
@@ -205,23 +216,5 @@ def create_performance_sheet(
             row["available_quantity"],
             row["inventory_value"]
         ])
-
-    last_row = ws.max_row
-
-    stripe_fill = PatternFill(
-        start_color="E9EEF7",
-        end_color="E9EEF7",
-        fill_type="solid"
-    )
-
-    for r in range(header_row + 1, last_row + 1):
-        if r % 2 == 0:
-            for c in range(1, 10):
-                ws.cell(row=r, column=c).fill = stripe_fill
-
-    # Currency formatting
-    for col in [4, 5, 6, 7, 9]:
-        for r in range(header_row + 1, last_row + 1):
-            ws.cell(row=r, column=col).number_format = '#,##0.00 "EGP"'
 
     auto_fit_columns(ws)
