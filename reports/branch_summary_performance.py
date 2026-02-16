@@ -1,5 +1,6 @@
 from openpyxl.styles import Font, PatternFill, Alignment
 from utils.excel_helpers import auto_fit_columns
+from core.deals_engine import normalize_brand_name
 
 
 def create_performance_sheet(
@@ -65,7 +66,7 @@ def create_performance_sheet(
     summary_df["inventory_value"] = summary_df["inventory_value"].fillna(0)
 
     # =====================================================
-    # APPLY DEALS
+    # APPLY DEALS (SMART MATCHING)
     # =====================================================
 
     after_percentage_list = []
@@ -77,9 +78,15 @@ def create_performance_sheet(
     for _, row in summary_df.iterrows():
 
         brand = row["brand"]
+        normalized_brand = normalize_brand_name(brand)
+
         sales_money = row["total"]
 
-        deal = deals_dict.get(brand, {"percentage": 0, "rent": 0})
+        deal = deals_dict.get(
+            normalized_brand,
+            {"percentage": 0, "rent": 0}
+        )
+
         percentage = deal["percentage"]
         rent = deal["rent"]
 
@@ -133,7 +140,7 @@ def create_performance_sheet(
 
     for i, (title, value) in enumerate(zip(kpi_titles, kpi_values)):
 
-        col_letter = chr(65 + i)  # A,B,C,D,E
+        col_letter = chr(65 + i)
 
         ws[f"{col_letter}1"] = title
         ws[f"{col_letter}2"] = value
