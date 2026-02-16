@@ -1,5 +1,6 @@
 from openpyxl.styles import Font, PatternFill, Alignment
 from utils.excel_helpers import auto_fit_columns
+from core.deals_engine import normalize_brand_name
 
 
 def extract_best_selling_product(brand_sales):
@@ -82,7 +83,9 @@ def create_report_sheet(
         total_inventory_qty = 0
         total_inventory_value = 0
 
-    deal = deals_dict.get(brand_name, {"percentage": 0, "rent": 0})
+    # 🔥🔥🔥 FIX HERE 🔥🔥🔥
+    normalized_brand = normalize_brand_name(brand_name)
+    deal = deals_dict.get(normalized_brand, {"percentage": 0, "rent": 0})
 
     percentage = deal.get("percentage", 0)
     rent = deal.get("rent", 0)
