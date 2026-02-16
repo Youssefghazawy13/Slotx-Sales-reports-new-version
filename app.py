@@ -5,7 +5,7 @@ from io import BytesIO
 
 from reports.workbook_builder import build_brand_workbook
 from reports.branch_summary_workbook import build_branch_summary_workbook
-from core.deals_engine import load_deals_by_mode
+from core.deals_engine import load_deals_by_mode, normalize_brand_name
 
 
 st.set_page_config(
@@ -15,14 +15,6 @@ st.set_page_config(
 )
 
 st.title("Slot-X Sales & Inventory Reports")
-
-
-# =========================================================
-# BRAND NORMALIZATION (SMART MATCHING)
-# =========================================================
-
-def normalize_brand(name):
-    return str(name).strip().lower()
 
 
 # =========================================================
@@ -117,13 +109,14 @@ if st.button("Generate Reports"):
             )
             inv_alex = pd.read_excel(inventory_alex_file)
 
-            # 🔥 NORMALIZE BRANDS
-            sales_zam["brand"] = sales_zam["brand"].apply(normalize_brand)
-            sales_alex["brand"] = sales_alex["brand"].apply(normalize_brand)
-            inv_zam["brand"] = inv_zam["brand"].apply(normalize_brand)
-            inv_alex["brand"] = inv_alex["brand"].apply(normalize_brand)
+            # 🔥 USE SAME NORMALIZATION EVERYWHERE
+            sales_zam["brand"] = sales_zam["brand"].apply(normalize_brand_name)
+            sales_alex["brand"] = sales_alex["brand"].apply(normalize_brand_name)
 
-            # quantities numeric
+            inv_zam["brand"] = inv_zam["brand"].apply(normalize_brand_name)
+            inv_alex["brand"] = inv_alex["brand"].apply(normalize_brand_name)
+
+            # Ensure numeric
             inv_zam["available_quantity"] = pd.to_numeric(
                 inv_zam["available_quantity"], errors="coerce"
             ).fillna(0)
@@ -137,10 +130,16 @@ if st.button("Generate Reports"):
             deals_zam = load_deals_by_mode(deals_file, "Zamalek")
             deals_alex = load_deals_by_mode(deals_file, "Alexandria")
 
-            # 🔥 Normalize deals keys
-            deals_merged = {normalize_brand(k): v for k, v in deals_merged.items()}
-            deals_zam = {normalize_brand(k): v for k, v in deals_zam.items()}
-            deals_alex = {normalize_brand(k): v for k, v in deals_alex.items()}
+            # Normalize deal keys
+            deals_merged = {
+                normalize_brand_name(k): v for k, v in deals_merged.items()
+            }
+            deals_zam = {
+                normalize_brand_name(k): v for k, v in deals_zam.items()
+            }
+            deals_alex = {
+                normalize_brand_name(k): v for k, v in deals_alex.items()
+            }
 
             all_brands = set(
                 list(inv_zam["brand"].unique()) +
@@ -220,12 +219,13 @@ if st.button("Generate Reports"):
             )
             inventory_df = pd.read_excel(inventory_file)
 
-            # 🔥 NORMALIZE
-            sales_df["brand"] = sales_df["brand"].apply(normalize_brand)
-            inventory_df["brand"] = inventory_df["brand"].apply(normalize_brand)
+            sales_df["brand"] = sales_df["brand"].apply(normalize_brand_name)
+            inventory_df["brand"] = inventory_df["brand"].apply(normalize_brand_name)
 
             deals_dict = load_deals_by_mode(deals_file, mode)
-            deals_dict = {normalize_brand(k): v for k, v in deals_dict.items()}
+            deals_dict = {
+                normalize_brand_name(k): v for k, v in deals_dict.items()
+            }
 
             brands = inventory_df["brand"].unique()
 
